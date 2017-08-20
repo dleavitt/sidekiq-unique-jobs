@@ -5,7 +5,7 @@ require 'sidekiq/worker'
 require 'sidekiq-unique-jobs'
 require 'rspec/wait'
 
-RSpec.describe SidekiqUniqueJobs::Client::Middleware do
+RSpec.describe SidekiqUniqueJobs::Client::Middleware, redis_db: 1 do
   def digest_for(item)
     SidekiqUniqueJobs::UniqueArgs.digest(item)
   end
@@ -23,10 +23,6 @@ RSpec.describe SidekiqUniqueJobs::Client::Middleware do
           end
           sleep 1
           Sidekiq::Scheduled::Enq.new.enqueue_jobs
-
-          Sidekiq.redis do |conn|
-            wait(10).for { conn.llen('queue:notify_worker') }.to eq(1)
-          end
 
           Sidekiq::Simulator.process_queue(:notify_worker) do
             sleep 1
@@ -292,7 +288,7 @@ RSpec.describe SidekiqUniqueJobs::Client::Middleware do
                'at' => expected_expires_at }
       digest = digest_for(item.merge('jid' => jid))
       Sidekiq.redis do |conn|
-        expect(conn.ttl(digest)).to eq(9_899)
+        expect(conn.ttl(digest)).to be_within(1).of(9_899)
       end
     end
 

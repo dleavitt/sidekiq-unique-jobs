@@ -25,7 +25,6 @@ module SidekiqUniqueJobs
         result = Scripts.call(:release_lock, redis_pool,
                               keys: [unique_key],
                               argv: [jid])
-
         handle_result(result)
       end
 

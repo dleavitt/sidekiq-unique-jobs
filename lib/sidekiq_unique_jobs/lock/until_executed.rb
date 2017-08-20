@@ -25,7 +25,7 @@ module SidekiqUniqueJobs
         if operative && unlock(:server)
           callback.call
         else
-          logger.fatal { "the unique_key: #{unique_key} needs to be unlocked manually" }
+          logger.fatal("the unique_key: #{unique_key} needs to be unlocked manually")
         end
       end
 

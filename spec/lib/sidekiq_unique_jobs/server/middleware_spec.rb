@@ -7,6 +7,8 @@ require 'sidekiq/worker'
 require 'sidekiq_unique_jobs/server/middleware'
 
 RSpec.describe SidekiqUniqueJobs::Server::Middleware do
+  let(:middleware) { SidekiqUniqueJobs::Server::Middleware.new }
+
   QUEUE ||= 'working'
 
   def digest_for(item)
@@ -14,38 +16,51 @@ RSpec.describe SidekiqUniqueJobs::Server::Middleware do
   end
 
   describe '#call' do
+    subject { middleware.call(*args) {} }
+    let(:args) { [WhileExecutingJob, { 'class' => 'WhileExecutingJob' }, 'working', nil] }
+
     context 'when unique is disabled' do
+      before do
+        allow(middleware).to receive(:unique_enabled?).and_return(false)
+      end
+
       it 'does not use locking' do
-        allow(subject).to receive(:unique_enabled?).and_return(false)
-        expect(subject).not_to receive(:lock)
-        args = [WhileExecutingJob, { 'class' => 'WhileExecutingJob' }, 'working', nil]
-        subject.call(*args) {}
+        expect(middleware).not_to receive(:lock)
+        subject
       end
     end
 
     context 'when unique is enabled' do
-      it 'executes the lock' do
-        allow(subject).to receive(:unique_enabled?).and_return(true)
-        lock = instance_spy(SidekiqUniqueJobs::Lock::WhileExecuting)
-        expect(lock).to receive(:send).with(:execute, instance_of(Proc)).and_yield
-        expect(subject).to receive(:lock).and_return(lock)
+      let(:lock) { instance_spy(SidekiqUniqueJobs::Lock::WhileExecuting) }
 
-        args = [WhileExecutingJob, { 'class' => 'WhileExecutingJob' }, 'working', nil]
-        subject.call(*args) {}
+      before do
+        allow(middleware).to receive(:unique_enabled?).and_return(true)
+        allow(middleware).to receive(:lock).and_return(lock)
+      end
+
+      it 'executes the lock' do
+        expect(lock).to receive(:send).with(:execute, instance_of(Proc)).and_yield
+        subject
       end
     end
 
     describe '#unlock' do
-      it 'does not unlock mutexes it does not own' do
+      it 'does not unlock keys it does not own' do
         jid = UntilExecutedJob.perform_async
         item = Sidekiq::Queue.new(QUEUE).find_job(jid).item
+
+        unique_digest = digest_for(item)
+
         Sidekiq.redis do |conn|
-          conn.set(digest_for(item), 'NOT_DELETED')
+          conn.set(unique_digest, 'NOT_DELETED')
         end
 
-        subject.call(UntilExecutedJob.new, item, QUEUE) do
+        expect(Sidekiq.logger).to receive(:fatal)
+          .with("the unique_key: #{unique_digest} needs to be unlocked manually")
+
+        middleware.call(UntilExecutedJob.new, item, QUEUE) do
           Sidekiq.redis do |conn|
-            expect(conn.get(digest_for(item))).to eq('NOT_DELETED')
+            expect(conn.get(unique_digest)).to eq('NOT_DELETED')
           end
         end
       end
@@ -56,7 +71,8 @@ RSpec.describe SidekiqUniqueJobs::Server::Middleware do
         jid = UntilExecutingJob.perform_async
         item = Sidekiq::Queue.new(QUEUE).find_job(jid).item
         worker = UntilExecutingJob.new
-        subject.call(worker, item, QUEUE) do
+
+        middleware.call(worker, item, QUEUE) do
           Sidekiq.redis do |conn|
             expect(conn.ttl(digest_for(item))).to eq(-2) # key does not exist
           end
@@ -69,7 +85,7 @@ RSpec.describe SidekiqUniqueJobs::Server::Middleware do
         jid = UntilExecutedJob.perform_async
         item = Sidekiq::Queue.new(QUEUE).find_job(jid).item
 
-        subject.call('UntilExecutedJob', item, QUEUE) do
+        middleware.call('UntilExecutedJob', item, QUEUE) do
           Sidekiq.redis do |conn|
             expect(conn.get(digest_for(item))).to eq jid
           end
