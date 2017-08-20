@@ -220,7 +220,6 @@ RSpec.describe SidekiqUniqueJobs::Lock::WhileExecuting do
         sleep 0.6
 
         watchdog.release_stale_locks!
-        binding.pry
         expect(lock.locked?).to eq(false)
       end
     end
