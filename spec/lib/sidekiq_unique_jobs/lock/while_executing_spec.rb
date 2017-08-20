@@ -214,13 +214,13 @@ RSpec.describe SidekiqUniqueJobs::Lock::WhileExecuting do
         lock.lock
 
         sleep 0.5
-
-        watchdog.release_stale_locks!
+        redis = SidekiqUniqueJobs.connection { |redis| redis }
+        watchdog.release_stale_locks!(redis)
         expect(lock.locked?).to eq(true)
 
         sleep 0.6
 
-        watchdog.release_stale_locks!
+        watchdog.release_stale_locks!(redis)
         expect(lock.locked?).to eq(false)
       end
     end

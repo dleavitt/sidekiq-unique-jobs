@@ -63,9 +63,10 @@ module SidekiqUniqueJobs
       def lock(timeout = nil)
         return true if timeout == :client
         exists_or_create!
-        release_stale_locks! if check_staleness?
 
         SidekiqUniqueJobs.connection(@redis_pool) do |conn|
+          release_stale_locks!(conn) if check_staleness?
+
           if timeout.nil? || timeout > 0
             # passing timeout 0 to blpop causes it to block
             _key, current_token = conn.blpop(available_key, timeout || 0)
@@ -83,16 +84,7 @@ module SidekiqUniqueJobs
             begin
               return_value = yield current_token
             ensure
-              conn.multi do
-                conn.hdel grabbed_key, current_token
-                conn.lpush available_key, current_token
-
-                if @expiration
-                  [available_key, exists_key, version_key].each do |key|
-                    conn.expire(key, @expiration)
-                  end
-                end
-              end
+              signal(conn, current_token)
             end
           end
 
@@ -153,22 +145,16 @@ module SidekiqUniqueJobs
           conn.hdel grabbed_key, token
           conn.lpush available_key, token
 
-          if @expiration
-            [available_key, exists_key, version_key].each do |key|
-              conn.expire(key, @expiration)
-            end
-          end
+          set_expiration_if_necessary(conn)
         end
       end
 
-      def release_stale_locks!
-        SidekiqUniqueJobs.connection(@redis_pool) do |conn|
-          simple_expiring_mutex(conn, :release_locks, 10) do
-            conn.hgetall(grabbed_key).each do |token, locked_at|
-              timed_out_at = locked_at.to_f + @stale_client_timeout
+      def release_stale_locks!(conn)
+        simple_expiring_mutex(conn, :release_locks, 10) do
+          conn.hgetall(grabbed_key).each do |token, locked_at|
+            timed_out_at = locked_at.to_f + @stale_client_timeout
 
-              signal(conn, token) if timed_out_at < current_time.to_f
-            end
+            signal(conn, token) if timed_out_at < current_time.to_f
           end
         end
       end
@@ -206,6 +192,14 @@ module SidekiqUniqueJobs
           # Make sure not to delete the lock in case someone else already expired
           # our lock, with one second in between to account for some lag.
           conn.del(key_name) if my_lock_expires_at > (current_time.to_f - 1)
+        end
+      end
+
+      def set_expiration_if_necessary(conn)
+        if @expiration
+          [available_key, exists_key, version_key].each do |key|
+            conn.expire(key, @expiration)
+          end
         end
       end
 
