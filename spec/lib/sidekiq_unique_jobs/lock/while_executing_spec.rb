@@ -214,13 +214,13 @@ RSpec.describe SidekiqUniqueJobs::Lock::WhileExecuting do
         lock.lock
 
         sleep 0.5
-        redis = SidekiqUniqueJobs.connection { |conn| conn }
-        watchdog.release_stale_locks!(redis)
+        watchdog.release_stale_locks!
         expect(lock.locked?).to eq(true)
 
         sleep 0.6
 
-        watchdog.release_stale_locks!(redis)
+        watchdog.release_stale_locks!
+        binding.pry
         expect(lock.locked?).to eq(false)
       end
     end
@@ -287,45 +287,6 @@ RSpec.describe SidekiqUniqueJobs::Lock::WhileExecuting do
           lock.exists_or_create!
           expect(SidekiqUniqueJobs.connection { |conn| conn.get(version_key) }).not_to be_nil
         end
-      end
-    end
-
-    # Private method tests, do not use
-    describe 'simple_expiring_mutex' do
-      let(:lock_options) { {} }
-
-      before do
-        lock.class.send(:public, :simple_expiring_mutex)
-      end
-
-      it 'gracefully expires stale lock' do
-        expiration = 1
-
-        thread =
-          Thread.new do
-            SidekiqUniqueJobs.connection do |conn|
-              lock.simple_expiring_mutex(conn, :test, expiration) do
-                sleep 3
-              end
-            end
-          end
-
-        sleep 1.5
-        SidekiqUniqueJobs.connection do |conn|
-          expect(lock.simple_expiring_mutex(conn, :test, expiration)).to be_falsy
-        end
-
-        sleep expiration
-
-        it_worked = false
-        SidekiqUniqueJobs.connection do |conn|
-          lock.simple_expiring_mutex(conn, :test, expiration) do
-            it_worked = true
-          end
-        end
-
-        expect(it_worked).to be_truthy
-        thread.join
       end
     end
   end

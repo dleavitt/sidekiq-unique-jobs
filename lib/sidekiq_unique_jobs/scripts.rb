@@ -42,7 +42,7 @@ module SidekiqUniqueJobs
         SCRIPT_SHAS.delete(file_name)
         call(file_name, redis_pool, options)
       else
-        raise ScriptError, "Problem compiling #{file_name}. Invalid LUA syntax?"
+        raise ScriptError, "Problem compiling #{file_name}. Message: #{ex.message}"
       end
     end
 

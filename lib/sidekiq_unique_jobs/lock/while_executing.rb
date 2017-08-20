@@ -64,10 +64,9 @@ module SidekiqUniqueJobs
       def lock(timeout = nil) # rubocop:disable Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity, Metrics/LineLength
         return true if timeout == :client
         exists_or_create!
+        result = release_stale_locks!
 
         SidekiqUniqueJobs.connection(@redis_pool) do |conn|
-          release_stale_locks!(conn) if check_staleness?
-
           if timeout.nil? || timeout.positive?
             # passing timeout 0 to blpop causes it to block
             _key, current_token = conn.blpop(available_key, timeout || 0)
@@ -157,51 +156,17 @@ module SidekiqUniqueJobs
         token
       end
 
-      def release_stale_locks!(conn)
-        simple_expiring_mutex(conn, :release_locks, 10) do
-          conn.hgetall(grabbed_key).each do |token, locked_at|
-            timed_out_at = locked_at.to_f + @stale_client_timeout
-
-            signal(conn, token) if timed_out_at < current_time.to_f
-          end
-        end
+      def release_stale_locks!
+        return unless check_staleness?
+        SidekiqUniqueJobs::Scripts.call(
+          :release_stale_locks,
+          @redis_pool,
+          keys:  [exists_key, grabbed_key, available_key, version_key, release_key],
+          argv: [10, @stale_client_timeout, @expiration],
+        )
       end
 
       private
-
-      def simple_expiring_mutex(conn, key_name, expires_in) # rubocop:disable Metrics/MethodLength
-        # Using the locking mechanism as described in
-        # http://redis.io/commands/setnx
-
-        key_name = namespaced_key(key_name)
-        cached_current_time = current_time.to_f
-        my_lock_expires_at = cached_current_time + expires_in + 1
-
-        got_lock = conn.setnx(key_name, my_lock_expires_at)
-
-        unless got_lock
-          # Check if expired
-          other_lock_expires_at = conn.get(key_name).to_f
-
-          if other_lock_expires_at < cached_current_time
-            old_expires_at = conn.getset(key_name, my_lock_expires_at).to_f
-
-            # Check if another client started cleanup yet. If not,
-            # then we now have the lock.
-            got_lock = (old_expires_at == other_lock_expires_at)
-          end
-        end
-
-        return false unless got_lock
-
-        begin
-          yield
-        ensure
-          # Make sure not to delete the lock in case someone else already expired
-          # our lock, with one second in between to account for some lag.
-          conn.del(key_name) if my_lock_expires_at > (current_time.to_f - 1)
-        end
-      end
 
       def expire_when_necessary(conn)
         return if @expiration.nil?
@@ -233,6 +198,10 @@ module SidekiqUniqueJobs
 
       def version_key
         @version_key ||= namespaced_key('VERSION')
+      end
+
+      def release_key
+        @release_key ||= namespaced_key('RELEASE')
       end
 
       def current_time

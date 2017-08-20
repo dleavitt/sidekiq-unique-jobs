@@ -40,7 +40,7 @@ RSpec.describe SidekiqUniqueJobs::Scripts do
         expect(described_class).to receive(:internal_call).with(script_name, nil, options).once
         expect { subject }.to raise_error(
           SidekiqUniqueJobs::ScriptError,
-          "Problem compiling #{script_name}. Invalid LUA syntax?",
+          "Problem compiling #{script_name}. Message: Some interesting error",
         )
       end
 

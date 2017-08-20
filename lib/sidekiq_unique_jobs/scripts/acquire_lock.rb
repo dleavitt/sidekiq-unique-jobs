@@ -39,7 +39,7 @@ module SidekiqUniqueJobs
           logger.debug { "failed to acquire lock for #{unique_key}" }
           false
         else
-          raise UnexpectedValue, "failed to acquire lock : unexpected return value (#{result})"
+          raise UnexpectedValue, "failed to acquire lock for #{unique_key} : unexpected return value (#{result})"
         end
       end
     end
