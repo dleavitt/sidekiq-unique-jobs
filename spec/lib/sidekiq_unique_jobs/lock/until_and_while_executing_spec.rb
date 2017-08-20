@@ -2,7 +2,8 @@
 
 require 'spec_helper'
 
-RSpec.describe SidekiqUniqueJobs::Lock::UntilAndWhileExecuting do
+RSpec.describe SidekiqUniqueJobs::Lock::UntilAndWhileExecuting, redis_db: 2 do
+  let(:lock) { described_class.new(item) }
   let(:item) do
     {
       'jid' => 'maaaahjid',
@@ -13,33 +14,32 @@ RSpec.describe SidekiqUniqueJobs::Lock::UntilAndWhileExecuting do
     }
   end
   let(:callback) { -> {} }
-  subject { described_class.new(item) }
 
   describe '#execute' do
+    let(:runtime_lock) { SidekiqUniqueJobs::Lock::WhileExecuting.new(item) }
+
     before do
-      subject.lock(:client)
+      Sidekiq.redis(&:flushdb)
+      allow(lock).to receive(:runtime_lock).and_return(runtime_lock)
+      lock.lock(:client)
     end
-    let(:runtime_lock) { SidekiqUniqueJobs::Lock::WhileExecuting.new(item, nil) }
 
     it 'unlocks the unique key before yielding' do
-      expect(SidekiqUniqueJobs::Lock::WhileExecuting)
-        .to receive(:new)
-        .with(item, nil)
-        .and_return(runtime_lock)
+      allow(callback).to receive(:call)
 
-      expect(callback).to receive(:call)
-
-      subject.execute(callback) do
+      lock.execute(callback) do
         Sidekiq.redis do |conn|
-          expect(conn.keys('uniquejobs:*').size).to eq(1)
+          expect(conn.keys('uniquejobs:*').size).to eq(3)
         end
 
         10.times { Sidekiq::Client.push(item) }
 
         Sidekiq.redis do |conn|
-          expect(conn.keys('uniquejobs:*').size).to eq(2)
+          expect(conn.keys('uniquejobs:*').size).to eq(4)
         end
       end
+
+      expect(callback).to have_received(:call)
     end
   end
 end

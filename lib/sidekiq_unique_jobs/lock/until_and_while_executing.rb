@@ -4,11 +4,17 @@ module SidekiqUniqueJobs
   module Lock
     class UntilAndWhileExecuting < UntilExecuting
       def execute(callback)
-        lock = WhileExecuting.new(item, redis_pool)
-        lock.synchronize do
-          callback.call if unlock(:server)
+        unlock(:server)
+
+        runtime_lock.lock do
           yield
         end
+
+        callback.call
+      end
+
+      def runtime_lock
+        @runtime_lock ||= SidekiqUniqueJobs::Lock::WhileExecuting.new(item, redis_pool: redis_pool)
       end
     end
   end

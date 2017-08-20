@@ -3,7 +3,8 @@
 require 'spec_helper'
 
 RSpec.describe SidekiqUniqueJobs::Lock::UntilTimeout do
-  subject { described_class.new(item) }
+  let(:lock) { described_class.new(item) }
+
   let(:item) do
     { 'jid' => 'maaaahjid',
       'class' => 'UntilExecutedJob',
@@ -13,14 +14,16 @@ RSpec.describe SidekiqUniqueJobs::Lock::UntilTimeout do
 
   describe '#unlock' do
     context 'when provided :server' do
-      it 'returns true' do
-        expect(subject.unlock(:server)).to eq(true)
-      end
+      subject { lock.unlock(:server) }
+
+      it { is_expected.to eq(true) }
     end
 
     context 'when provided with anything else than :server' do
+      subject { lock.unlock(:client) }
+
       it 'raises a helpful error message' do
-        expect { subject.unlock(:client) }
+        expect { subject }
           .to raise_error(ArgumentError, /client middleware can't unlock uniquejobs:*/)
       end
     end

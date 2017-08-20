@@ -3,7 +3,9 @@
 require 'spec_helper'
 
 RSpec.describe SidekiqUniqueJobs::Lock::WhileExecuting do
-  let(:item) do
+  let(:lock) { described_class.new(lock_item, lock_options) }
+  let(:multilock)  { described_class.new(multilock_item, multilock_options) }
+  let(:lock_item) do
     {
       'jid' => 'maaaahjid',
       'queue' => 'dupsallowed',
@@ -13,76 +15,318 @@ RSpec.describe SidekiqUniqueJobs::Lock::WhileExecuting do
       'args' => [1],
     }
   end
+  let(:multilock_item) do
+    {
+      'jid' => 'maaaahjid',
+      'queue' => 'dupsallowed',
+      'class' => 'UntilAndWhileExecuting',
+      'unique' => 'until_executed',
+      'unique_digest' => 'test_mutex_key',
+      'args' => [1],
+    }
+  end
+  let(:lock_options) { {} }
+  let(:multilock_options)  { { resources: 2 } }
 
-  it 'allows only one mutex object to have the lock at a time' do
-    mutexes = (1..10).map do
-      described_class.new(item)
-    end
+  describe 'redis' do
+    shared_examples_for 'a lock' do
+      it 'has the correct amount of available resources' do
+        lock.lock
+        expect(lock.unlock).to eq(1)
+        expect(lock.available_count).to eq(1)
+      end
 
-    x = 0
-    mutexes.map do |m|
-      Thread.new do
-        m.synchronize do
-          y = x
-          sleep 0.1
-          x = y + 1
+      it 'has the correct amount of available resources before locking' do
+        expect(lock.available_count).to eq(1)
+      end
+
+      it 'should not exist from the start' do
+        expect(lock.exists?).to eq(false)
+        lock.lock
+        expect(lock.exists?).to eq(true)
+      end
+
+      it 'should be unlocked from the start' do
+        expect(lock.locked?).to eq(false)
+      end
+
+      it 'should lock and unlock' do
+        lock.lock(1)
+        expect(lock.locked?).to eq(true)
+        lock.unlock
+        expect(lock.locked?).to eq(false)
+      end
+
+      it 'should not lock twice as a mutex' do
+        expect(lock.lock(1)).not_to eq(false)
+        expect(lock.lock(1)).to eq(false)
+      end
+
+      it 'should not lock three times when only two available' do
+        expect(multilock.lock(1)).not_to eq(false)
+        expect(multilock.lock(1)).not_to eq(false)
+        expect(multilock.lock(1)).to eq(false)
+      end
+
+      it 'should always have the correct lock-status' do
+        multilock.lock(1)
+        multilock.lock(1)
+
+        expect(multilock.locked?).to eq(true)
+        multilock.unlock
+        expect(multilock.locked?).to eq(true)
+        multilock.unlock
+        expect(multilock.locked?).to eq(false)
+      end
+
+      it 'should get all different tokens when saturating' do
+        ids = []
+        2.times do
+          ids << multilock.lock(1)
+        end
+
+        expect(ids).to eq(%w[0 1])
+      end
+
+      it 'should execute the given code block' do
+        code_executed = false
+        lock.lock(1) do
+          code_executed = true
+        end
+        expect(code_executed).to eq(true)
+      end
+
+      it 'should pass an exception right through' do
+        expect do
+          lock.lock(1) do
+            raise Exception, 'redis lock exception'
+          end
+        end.to raise_error(Exception, 'redis lock exception')
+      end
+
+      it 'should not leave the lock locked after raising an exception' do
+        expect do
+          lock.lock(1) do
+            raise Exception, 'redis lock exception'
+          end
+        end.to raise_error(Exception, 'redis lock exception')
+
+        expect(lock.locked?).to eq(false)
+      end
+
+      it 'should return the value of the block if block-style locking is used' do
+        block_value = lock.lock(1) do
+          42
+        end
+        expect(block_value).to eq(42)
+      end
+
+      it 'can return the passed in token to replicate old behaviour' do
+        lock_token = lock.lock(1)
+        lock.unlock
+
+        block_value = lock.lock(1) do |token|
+          token
+        end
+        expect(block_value).to eq(lock_token)
+      end
+
+      it 'should disappear without a trace when calling `delete!`' do
+        original_key_size = SidekiqUniqueJobs.connection { |conn| conn.keys.count }
+
+        lock.exists_or_create!
+        lock.delete!
+
+        expect(SidekiqUniqueJobs.connection { |conn| conn.keys.count }).to eq(original_key_size)
+      end
+
+      it 'should not block when the timeout is zero' do
+        did_we_get_in = false
+
+        lock.lock do
+          lock.lock(0) do
+            did_we_get_in = true
+          end
+        end
+
+        expect(did_we_get_in).to be false
+      end
+
+      it 'should be locked when the timeout is zero' do
+        lock.lock(0) do
+          expect(lock.locked?).to be true
         end
       end
-    end.map(&:join)
-
-    expect(x).to eq(10)
-  end
-
-  it 'expires the lock on the mutex object after run_lock_expiration if specified' do
-    mutexes = (1..10).map do
-      described_class.new(item)
     end
 
-    worker = SidekiqUniqueJobs.worker_class_constantize(item[SidekiqUniqueJobs::CLASS_KEY])
-    allow(worker).to receive(:get_sidekiq_options)
-      .and_return('retry'               => true,
-                  'queue'               => :dupsallowed,
-                  'run_lock_expiration' => 0,
-                  'unique'              => :until_and_while_executing)
+    describe 'lock with expiration' do
+      let(:lock_options) { { expiration: 1 } }
+      let(:multilock_options)  { { resources: 2, expiration: 2 } }
 
-    start_times = []
-    sleep_time = 0.1
-    mutexes.each_with_index.map do |m, i|
-      Thread.new do
-        m.synchronize do
-          start_times[i] = Time.now
-          sleep sleep_time
+      it_behaves_like 'a lock'
+
+      def current_keys
+        SidekiqUniqueJobs.connection { |conn| conn.keys }
+      end
+
+      it 'expires keys' do
+        Sidekiq.redis(&:flushdb)
+        lock.exists_or_create!
+        keys = current_keys
+        sleep 3.0
+        expect(current_keys).not_to include(keys)
+      end
+
+      it 'expires keys after unlocking' do
+        Sidekiq.redis(&:flushdb)
+        lock.lock do
+          # noop
+        end
+        keys = current_keys
+        sleep 3.0
+        expect(current_keys).not_to include(keys)
+      end
+    end
+
+    describe 'lock without staleness checking' do
+      it_behaves_like 'a lock'
+
+      it 'can dynamically add resources' do
+        lock.exists_or_create!
+
+        SidekiqUniqueJobs.connection do |conn|
+          3.times do
+            lock.signal(conn)
+          end
+        end
+
+        expect(lock.available_count).to eq(4)
+
+        lock.wait(1)
+        lock.wait(1)
+        lock.wait(1)
+
+        expect(lock.available_count).to eq(1)
+      end
+
+      it 'can have stale locks released by a third process' do
+        watchdog = described_class.new(lock_item, stale_client_timeout: 1)
+        lock.lock
+
+        sleep 0.5
+
+        watchdog.release_stale_locks!
+        expect(lock.locked?).to eq(true)
+
+        sleep 0.6
+
+        watchdog.release_stale_locks!
+        expect(lock.locked?).to eq(false)
+      end
+    end
+
+    describe 'lock with staleness checking' do
+      let(:lock_options) { { stale_client_timeout: 5 } }
+      let(:multilock_options) { { resources: 2, stale_client_timeout: 5 } }
+
+      it_behaves_like 'a lock'
+
+      it 'should restore resources of stale clients' do
+        hyper_aggressive_lock = described_class.new(lock_item, resources: 1, stale_client_timeout: 1)
+
+        expect(hyper_aggressive_lock.lock(1)).not_to eq(false)
+        expect(hyper_aggressive_lock.lock(1)).to eq(false)
+        expect(hyper_aggressive_lock.lock(1)).not_to eq(false)
+      end
+    end
+
+    describe 'redis time' do
+      let(:lock_options) { { stale_client_timeout: 5 } }
+
+      before(:all) do
+        Timecop.freeze(Time.local(1990))
+      end
+
+      it 'with time support should return a different time than frozen time' do
+        expect(lock.send(:current_time)).not_to eq(Time.now)
+      end
+
+      context 'when use_local_time is true' do
+        let(:lock_options) { { stale_client_timeout: 5, use_local_time: true } }
+
+        it 'with use_local_time should return the same time as frozen time' do
+          expect(lock.send(:current_time)).to eq(Time.now)
         end
       end
-    end.map(&:join)
-
-    expect(start_times.size).to be 10
-    expect(start_times.sort.last - start_times.sort.first).to be < sleep_time * 10
-  end
-
-  it 'handles auto cleanup correctly' do
-    m = described_class.new(item)
-
-    SidekiqUniqueJobs.connection do |conn|
-      conn.set 'test_mutex_key:run', Time.now.to_i - 1, nx: true
     end
 
-    start = Time.now.to_i
-    m.synchronize do
-      'nop'
-    end
+    describe 'all_tokens' do
+      let(:lock_options) { { stale_client_timeout: 5 } }
 
-    # no longer than a second
-    expect(Time.now.to_i).to be <= start + 1
-  end
+      it 'includes tokens from available and grabbed keys' do
+        lock.exists_or_create!
+        available_keys = lock.all_tokens
+        lock.lock(1)
+        grabbed_keys = lock.all_tokens
 
-  it 'maintains mutex semantics' do
-    m = described_class.new(item)
-
-    expect do
-      m.synchronize do
-        m.synchronize {}
+        expect(available_keys).to eq(grabbed_keys)
       end
-    end.to raise_error(ThreadError)
+    end
+
+    describe 'version' do
+      context 'with an existing versionless lock' do
+        let(:old_sem) { described_class.new(lock_item) }
+        let(:version_key) { old_sem.send(:version_key) }
+
+        before do
+          old_sem.exists_or_create!
+          SidekiqUniqueJobs.connection { |conn| conn.del(version_key) }
+        end
+
+        it 'sets the version key' do
+          lock.exists_or_create!
+          expect(SidekiqUniqueJobs.connection { |conn| conn.get(version_key) }).not_to be_nil
+        end
+      end
+    end
+
+    # Private method tests, do not use
+    describe 'simple_expiring_mutex' do
+      let(:lock_options) { {} }
+
+      before do
+        lock.class.send(:public, :simple_expiring_mutex)
+      end
+
+      it 'gracefully expires stale lock' do
+        expiration = 1
+
+        thread =
+          Thread.new do
+            SidekiqUniqueJobs.connection do |conn|
+              lock.simple_expiring_mutex(conn, :test, expiration) do
+                sleep 3
+              end
+            end
+          end
+
+        sleep 1.5
+        SidekiqUniqueJobs.connection do |conn|
+          expect(lock.simple_expiring_mutex(conn, :test, expiration)).to be_falsy
+        end
+
+        sleep expiration
+
+        it_worked = false
+        SidekiqUniqueJobs.connection do |conn|
+          lock.simple_expiring_mutex(conn, :test, expiration) do
+            it_worked = true
+          end
+        end
+
+        expect(it_worked).to be_truthy
+        thread.join
+      end
+    end
   end
 end
