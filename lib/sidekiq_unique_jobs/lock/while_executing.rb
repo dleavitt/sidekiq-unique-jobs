@@ -64,7 +64,7 @@ module SidekiqUniqueJobs
       def lock(timeout = nil) # rubocop:disable Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity, Metrics/LineLength
         return true if timeout == :client
         exists_or_create!
-        result = release_stale_locks!
+        release_stale_locks!
 
         SidekiqUniqueJobs.connection(@redis_pool) do |conn|
           if timeout.nil? || timeout.positive?
