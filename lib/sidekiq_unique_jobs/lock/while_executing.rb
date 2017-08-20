@@ -18,11 +18,13 @@ module SidekiqUniqueJobs
       # SidekiqUniqueJobs::Lock::WhileExecuting.new(item, :path => "bla")
       def initialize(item, opts = {})
         @item = item
-        @name = create_digest
+        @name = unique_digest
         @redis_pool = opts.delete(:redis_pool)
         @expiration = opts.delete(:expiration)
         @resource_count = opts.delete(:resources) || 1
-        @stale_client_timeout = opts.delete(:stale_client_timeout)
+        @stale_client_timeout = opts.delete(:stale_client_timeout) do
+          RunLockTimeoutCalculator.for_item(@item).seconds
+        end
         @use_local_time = opts.delete(:use_local_time)
         @tokens = []
       end
@@ -218,9 +220,9 @@ module SidekiqUniqueJobs
         end
       end
 
-      def create_digest
-        @create_digest ||= @item[UNIQUE_DIGEST_KEY]
-        @create_digest ||= SidekiqUniqueJobs::UniqueArgs.digest(@item)
+      def unique_digest
+        @unique_digest ||= @item[UNIQUE_DIGEST_KEY]
+        @unique_digest ||= SidekiqUniqueJobs::UniqueArgs.digest(@item)
       end
     end
   end
