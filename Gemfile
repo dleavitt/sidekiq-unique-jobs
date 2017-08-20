@@ -3,7 +3,7 @@
 source 'https://rubygems.org'
 gemspec
 
-gem 'appraisal', '~> 2.0.0'
+gem 'appraisal', '~> 2.2.0'
 gem 'rspec-its',  require: false
 gem 'rspec-wait', require: false
 
