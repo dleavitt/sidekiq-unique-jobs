@@ -12,7 +12,7 @@ RSpec.describe SidekiqUniqueJobs::Lock::UntilExecuted do
       {
         'jid' => 'maaaahjid',
         'class' => 'UntilExecutedJob',
-        'unique' => 'until_executed'
+        'unique' => 'until_executed',
       }
     end
 
@@ -22,7 +22,7 @@ RSpec.describe SidekiqUniqueJobs::Lock::UntilExecuted do
         allow(lock).to receive(:unlock).and_return(true)
         expect(lock).not_to receive(:unlock)
         expect(Sidekiq.logger).to receive(:fatal)
-          .with("the unique_key: uniquejobs:a1e5ccafbc77b234e8f8aaedde3f706e needs to be unlocked manually")
+          .with('the unique_key: uniquejobs:a1e5ccafbc77b234e8f8aaedde3f706e needs to be unlocked manually')
 
         expect(empty_callback).not_to receive(:call)
       end

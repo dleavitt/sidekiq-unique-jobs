@@ -2,6 +2,7 @@
 
 module SidekiqUniqueJobs
   module Lock
+    # rubocop:disable ClassLength
     class WhileExecuting
       EXISTS_TOKEN = '1'
       API_VERSION = '1'
@@ -31,7 +32,7 @@ module SidekiqUniqueJobs
           :create,
           @redis_pool,
           keys: [exists_key, grabbed_key, available_key, version_key],
-          argv: [EXISTS_TOKEN, @resource_count, @expiration, API_VERSION]
+          argv: [EXISTS_TOKEN, @resource_count, @expiration, API_VERSION],
         )
       end
 
@@ -60,14 +61,14 @@ module SidekiqUniqueJobs
         end
       end
 
-      def lock(timeout = nil)
+      def lock(timeout = nil) # rubocop:disable Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity, Metrics/LineLength
         return true if timeout == :client
         exists_or_create!
 
         SidekiqUniqueJobs.connection(@redis_pool) do |conn|
           release_stale_locks!(conn) if check_staleness?
 
-          if timeout.nil? || timeout > 0
+          if timeout.nil? || timeout.positive?
             # passing timeout 0 to blpop causes it to block
             _key, current_token = conn.blpop(available_key, timeout || 0)
           else
@@ -113,40 +114,47 @@ module SidekiqUniqueJobs
             conn.hexists(grabbed_key, token)
           end
         else
-          @tokens.each do |token|
-            return true if locked?(token)
+          @tokens.each do |cached_token|
+            return true if locked?(cached_token)
           end
 
           false
         end
       end
 
-      def all_tokens
-        SidekiqUniqueJobs.connection(@redis_pool) do |conn|
-          conn.multi do
-            conn.lrange(available_key, 0, -1)
-            conn.hkeys(grabbed_key)
-          end.flatten
+      def all_tokens(conn = nil)
+        if conn
+          all_tokens_for(conn)
+        else
+          SidekiqUniqueJobs.connection(@redis_pool) do |redis|
+            all_tokens_for(redis)
+          end
         end
       end
 
+      def all_tokens_for(conn)
+        conn.multi do
+          conn.lrange(available_key, 0, -1)
+          conn.hkeys(grabbed_key)
+        end.flatten
+      end
+
       def signal(conn, token = 1)
-        token ||= begin
-          tokens = conn.multi do
-            conn.lrange(available_key, 0, -1)
-            conn.hkeys(grabbed_key)
-          end.flatten
-          token = Random.rand.to_s
-          token = Random.rand.to_s while tokens.include? token
-          token
-        end
+        token ||= generate_unique_token(conn)
 
         conn.multi do
           conn.hdel grabbed_key, token
           conn.lpush available_key, token
 
-          set_expiration_if_necessary(conn)
+          expire_when_necessary(conn)
         end
+      end
+
+      def generate_unique_token(conn)
+        tokens = all_tokens(conn)
+        token = Random.rand.to_s
+        token = Random.rand.to_s while tokens.include? token
+        token
       end
 
       def release_stale_locks!(conn)
@@ -161,7 +169,7 @@ module SidekiqUniqueJobs
 
       private
 
-      def simple_expiring_mutex(conn, key_name, expires_in)
+      def simple_expiring_mutex(conn, key_name, expires_in) # rubocop:disable Metrics/MethodLength
         # Using the locking mechanism as described in
         # http://redis.io/commands/setnx
 
@@ -195,11 +203,11 @@ module SidekiqUniqueJobs
         end
       end
 
-      def set_expiration_if_necessary(conn)
-        if @expiration
-          [available_key, exists_key, version_key].each do |key|
-            conn.expire(key, @expiration)
-          end
+      def expire_when_necessary(conn)
+        return if @expiration.nil?
+
+        [available_key, exists_key, version_key].each do |key|
+          conn.expire(key, @expiration)
         end
       end
 
@@ -232,7 +240,7 @@ module SidekiqUniqueJobs
           Time.now
         else
           begin
-            instant = SidekiqUniqueJobs.connection(@redis_pool) { |conn| conn.time }
+            instant = SidekiqUniqueJobs.connection(@redis_pool, &:time)
             Time.at(instant[0], instant[1])
           rescue
             @use_local_time = true

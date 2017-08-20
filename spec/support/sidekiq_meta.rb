@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+# rubocop:disable BlockLength
 RSpec.configure do |config|
   config.before(:each) do |example|
     SidekiqUniqueJobs.configure do |conn|
@@ -8,12 +9,11 @@ RSpec.configure do |config|
 
     if (redis_db = example.metadata.fetch(:redis_db) { 0 })
       redis_url = "redis://localhost/#{redis_db}"
-      redis_namespace = 'unique-test'
       redis_options = { url: redis_url }
       redis = Sidekiq::RedisConnection.create(redis_options)
 
-      Sidekiq.configure_client do |config|
-        config.redis = redis_options
+      Sidekiq.configure_client do |sidekiq_config|
+        sidekiq_config.redis = redis_options
       end
       SidekiqUniqueJobs.configure do |unique_config|
         unique_config.redis_test_mode = :redis

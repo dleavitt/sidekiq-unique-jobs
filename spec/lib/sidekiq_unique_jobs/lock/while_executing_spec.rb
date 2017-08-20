@@ -3,8 +3,10 @@
 require 'spec_helper'
 
 RSpec.describe SidekiqUniqueJobs::Lock::WhileExecuting do
-  let(:lock) { described_class.new(lock_item, lock_options) }
-  let(:multilock)  { described_class.new(multilock_item, multilock_options) }
+  let(:lock)              { described_class.new(lock_item, lock_options) }
+  let(:multilock)         { described_class.new(multilock_item, multilock_options) }
+  let(:lock_options)      { {} }
+  let(:multilock_options) { { resources: 2 } }
   let(:lock_item) do
     {
       'jid' => 'maaaahjid',
@@ -25,8 +27,6 @@ RSpec.describe SidekiqUniqueJobs::Lock::WhileExecuting do
       'args' => [1],
     }
   end
-  let(:lock_options) { {} }
-  let(:multilock_options)  { { resources: 2 } }
 
   describe 'redis' do
     shared_examples_for 'a lock' do
@@ -161,12 +161,12 @@ RSpec.describe SidekiqUniqueJobs::Lock::WhileExecuting do
 
     describe 'lock with expiration' do
       let(:lock_options) { { expiration: 1 } }
-      let(:multilock_options)  { { resources: 2, expiration: 2 } }
+      let(:multilock_options) { { resources: 2, expiration: 2 } }
 
       it_behaves_like 'a lock'
 
       def current_keys
-        SidekiqUniqueJobs.connection { |conn| conn.keys }
+        SidekiqUniqueJobs.connection(&:keys)
       end
 
       it 'expires keys' do
@@ -214,7 +214,7 @@ RSpec.describe SidekiqUniqueJobs::Lock::WhileExecuting do
         lock.lock
 
         sleep 0.5
-        redis = SidekiqUniqueJobs.connection { |redis| redis }
+        redis = SidekiqUniqueJobs.connection { |conn| conn }
         watchdog.release_stale_locks!(redis)
         expect(lock.locked?).to eq(true)
 

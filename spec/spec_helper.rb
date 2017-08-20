@@ -28,7 +28,7 @@ require 'sidekiq/redis_connection'
 
 Dir[File.join(File.dirname(__FILE__), 'support', '**', '*.rb')].each { |f| require f }
 
-RSpec.configure do |config| # rubocop:disable BlockLength
+RSpec.configure do |config|
   config.define_derived_metadata do |meta|
     meta[:aggregate_failures] = true
   end
