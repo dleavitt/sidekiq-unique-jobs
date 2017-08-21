@@ -1,5 +1,9 @@
 sudo: false
 language: ruby
+addons:
+  apt:
+    packages:
+      - redis-server
 cache: bundler
 # before_install:
 #   - rvm get head

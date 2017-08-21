@@ -1,4 +1,4 @@
--- redis.replicate_commands();
+redis.replicate_commands();
 
 local exists_key           = KEYS[1]
 local grabbed_key          = KEYS[2]
