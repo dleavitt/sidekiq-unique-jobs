@@ -6,6 +6,7 @@ module SidekiqUniqueJobs
     class WhileExecuting
       EXISTS_TOKEN = '1'
       API_VERSION = '1'
+      EXPIRES_IN = 10
 
       # stale_client_timeout is the threshold of time before we assume
       # that something has gone terribly wrong with a client and we
@@ -127,8 +128,8 @@ module SidekiqUniqueJobs
         if conn
           all_tokens_for(conn)
         else
-          SidekiqUniqueJobs.connection(@redis_pool) do |redis|
-            all_tokens_for(redis)
+          SidekiqUniqueJobs.connection(@redis_pool) do |conn|
+            all_tokens_for(conn)
           end
         end
       end
@@ -160,15 +161,70 @@ module SidekiqUniqueJobs
 
       def release_stale_locks!
         return unless check_staleness?
+        if SidekiqUniqueJobs.redis_version >= "3.2"
+          release_stale_locks_new!
+        else
+          release_stale_locks_old!
+        end
+      end
+
+      private
+
+      def release_stale_locks_new!
         SidekiqUniqueJobs::Scripts.call(
           :release_stale_locks,
           @redis_pool,
           keys:  [exists_key, grabbed_key, available_key, version_key, release_key],
-          argv: [10, @stale_client_timeout, @expiration],
+          argv: [EXPIRES_IN, @stale_client_timeout, @expiration],
         )
       end
 
-      private
+      def release_stale_locks_old!
+        SidekiqUniqueJobs.connection(@redis_pool) do |conn|
+          simple_expiring_mutex(conn) do
+            conn.hgetall(grabbed_key).each do |token, locked_at|
+              timed_out_at = locked_at.to_f + @stale_client_timeout
+
+              if timed_out_at < current_time.to_f
+                signal(conn, token)
+              end
+            end
+          end
+        end
+      end
+
+      def simple_expiring_mutex(conn)
+        # Using the locking mechanism as described in
+        # http://redis.io/commands/setnx
+
+        cached_current_time = current_time.to_f
+        my_lock_expires_at = cached_current_time + EXPIRES_IN + 1
+
+        got_lock = conn.setnx(release_key, my_lock_expires_at)
+
+        if !got_lock
+          # Check if expired
+          other_lock_expires_at = conn.get(release_key).to_f
+
+          if other_lock_expires_at < cached_current_time
+            old_expires_at = conn.getset(release_key, my_lock_expires_at).to_f
+
+            # Check if another client started cleanup yet. If not,
+            # then we now have the lock.
+            got_lock = (old_expires_at == other_lock_expires_at)
+          end
+        end
+
+        return false if !got_lock
+
+        begin
+          yield
+        ensure
+          # Make sure not to delete the lock in case someone else already expired
+          # our lock, with one second in between to account for some lag.
+          conn.del(release_key) if my_lock_expires_at > (current_time.to_f - 1)
+        end
+      end
 
       def expire_when_necessary(conn)
         return if @expiration.nil?
