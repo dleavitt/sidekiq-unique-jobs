@@ -1,4 +1,4 @@
-redis.replicate_commands();
+-- redis.replicate_commands();
 
 local unique_key = KEYS[1]
 local job_id     = ARGV[1]

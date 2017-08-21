@@ -1,4 +1,4 @@
-redis.replicate_commands();
+-- redis.replicate_commands();
 
 local exists_key           = KEYS[1]
 local grabbed_key          = KEYS[2]
@@ -19,6 +19,20 @@ local function current_time()
   return number
 end
 
+local hgetall = function (key)
+  local bulk = redis.call('HGETALL', key)
+  local result = {}
+  local nextkey
+  for i, v in ipairs(bulk) do
+    if i % 2 == 1 then
+      nextkey = v
+    else
+      result[nextkey] = v
+    end
+  end
+  return result
+end
+
 local cached_current_time = current_time()
 local my_lock_expires_at = cached_current_time + expires_in + 1
 
@@ -35,20 +49,6 @@ if not redis.call('SETNX', lock_key, my_lock_expires_at) then
       return 0
     end
   end
-end
-
-local hgetall = function (key)
-  local bulk = redis.call('HGETALL', key)
-  local result = {}
-  local nextkey
-  for i, v in ipairs(bulk) do
-    if i % 2 == 1 then
-      nextkey = v
-    else
-      result[nextkey] = v
-    end
-  end
-  return result
 end
 
 local keys = hgetall(grabbed_key)
