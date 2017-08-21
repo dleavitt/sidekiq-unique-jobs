@@ -1,10 +1,10 @@
 sudo: false
 language: ruby
 before_install:
-  - sudo rm -rf /etc/apt/sources.list.d/rwky-redis.list
-  - sudo add-apt-repository ppa:chris-lea/redis-server -y
-  - sudo apt-get update -qy
-  - sudo apt-get install redis-server
+  - rm -rf /etc/apt/sources.list.d/rwky-redis.list
+  - add-apt-repository ppa:chris-lea/redis-server -y
+  - apt-get update -qy
+  - apt-get install redis-server
 cache: bundler
 # before_install:
 #   - rvm get head
