@@ -1,5 +1,9 @@
 sudo: false
 language: ruby
+before_install:
+  - sudo rm -rf /etc/apt/sources.list.d/rwky-redis.list
+  - sudo add-apt-repository ppa:chris-lea/redis-server -y
+  - sudo apt-get update -qy
 addons:
   apt:
     packages:
