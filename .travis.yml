@@ -1,3 +1,4 @@
+dist: trusty
 sudo: required
 language: ruby
 before_install:
@@ -5,9 +6,8 @@ before_install:
   - sudo add-apt-repository ppa:chris-lea/redis-server -y
   - sudo apt-get update -qy
   - sudo apt-get install redis-server
+  - sudo service redis-server start
 cache: bundler
-services:
-  - redis-server
 script:
   - if [[ "${STYLE}" = "true" ]]; then bundle exec rubocop - P; fi;
   - bundle exec rspec spec
