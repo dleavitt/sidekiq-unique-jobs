@@ -2,6 +2,7 @@
 
 require 'spec_helper'
 require 'thor/runner'
+require 'irb'
 
 RSpec.describe SidekiqUniqueJobs::Cli, ruby_ver: '>= 2.4' do
   describe '#help' do
@@ -176,7 +177,7 @@ RSpec.describe SidekiqUniqueJobs::Cli, ruby_ver: '>= 2.4' do
 
     specify do
       expect(Object).to receive(:include).with(SidekiqUniqueJobs::Util).and_return(true)
-      allow(Pry).to receive(:start).and_return(true)
+      allow(IRB).to receive(:start).and_return(true)
       expect(output).to eq(expected)
     end
   end

@@ -5,7 +5,7 @@ if RUBY_ENGINE == 'ruby' && RUBY_VERSION >= '2.4.0'
   require 'simplecov'
 
   begin
-    require 'pry-byebug'
+    require 'byebug'
   rescue LoadError
     puts 'Pry unavailable'
   end
