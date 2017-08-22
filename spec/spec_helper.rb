@@ -22,6 +22,7 @@ require 'sidekiq_unique_jobs/testing'
 require 'sidekiq/simulator'
 
 Sidekiq::Testing.disable!
+Sidekiq.logger = Logger.new('/dev/null')
 SidekiqUniqueJobs.logger.level = Object.const_get("Logger::#{ENV.fetch('LOGLEVEL') { 'error' }.upcase}")
 
 require 'sidekiq/redis_connection'
