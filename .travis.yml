@@ -21,7 +21,7 @@ before_script:
 script:
   - if [[ "${STYLE}" = "true" ]]; then bundle exec rubocop - P; fi;
   - bundle exec rspec spec
-  - ./cc-test-reporter after-build --exit-code $TRAVIS_TEST_RESULT
+  - if [[ "${STYLE}" = "true" ]]; then ./cc-test-reporter after-build --exit-code $TRAVIS_TEST_RESULT; fi;
 
 rvm:
   - 2.4.1
