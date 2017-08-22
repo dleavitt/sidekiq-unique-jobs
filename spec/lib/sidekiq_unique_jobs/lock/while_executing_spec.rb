@@ -228,14 +228,36 @@ RSpec.describe SidekiqUniqueJobs::Lock::WhileExecuting do
       let(:lock_options) { { stale_client_timeout: 5 } }
       let(:multilock_options) { { resources: 2, stale_client_timeout: 5 } }
 
-      it_behaves_like 'a lock'
+      context 'when redis_version is old' do
+        before do
+          allow(SidekiqUniqueJobs).to receive(:redis_version).and_return('3.0')
+        end
 
-      it 'should restore resources of stale clients' do
-        hyper_aggressive_lock = described_class.new(lock_item, resources: 1, stale_client_timeout: 1)
+        it_behaves_like 'a lock'
 
-        expect(hyper_aggressive_lock.lock(1)).not_to eq(false)
-        expect(hyper_aggressive_lock.lock(1)).to eq(false)
-        expect(hyper_aggressive_lock.lock(1)).not_to eq(false)
+        it 'should restore resources of stale clients' do
+          hyper_aggressive_lock = described_class.new(lock_item, resources: 1, stale_client_timeout: 1)
+
+          expect(hyper_aggressive_lock.lock(1)).not_to eq(false)
+          expect(hyper_aggressive_lock.lock(1)).to eq(false)
+          expect(hyper_aggressive_lock.lock(1)).not_to eq(false)
+        end
+      end
+
+      context 'when redis_version is new' do
+        before do
+          allow(SidekiqUniqueJobs).to receive(:redis_version).and_return('4.0')
+        end
+
+        it_behaves_like 'a lock'
+
+        it 'should restore resources of stale clients' do
+          hyper_aggressive_lock = described_class.new(lock_item, resources: 1, stale_client_timeout: 1)
+
+          expect(hyper_aggressive_lock.lock(1)).not_to eq(false)
+          expect(hyper_aggressive_lock.lock(1)).to eq(false)
+          expect(hyper_aggressive_lock.lock(1)).not_to eq(false)
+        end
       end
     end
 

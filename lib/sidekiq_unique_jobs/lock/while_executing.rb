@@ -64,7 +64,7 @@ module SidekiqUniqueJobs
         end
       end
 
-      def lock(timeout = nil) # rubocop:disable Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity, Metrics/LineLength
+      def lock(timeout = nil) # rubocop:disable Metrics/MethodLength
         return true if timeout == :client
         exists_or_create!
         release_stale_locks!
@@ -128,8 +128,8 @@ module SidekiqUniqueJobs
         if conn
           all_tokens_for(conn)
         else
-          SidekiqUniqueJobs.connection(@redis_pool) do |conn|
-            all_tokens_for(conn)
+          SidekiqUniqueJobs.connection(@redis_pool) do |redis|
+            all_tokens_for(redis)
           end
         end
       end
@@ -161,16 +161,17 @@ module SidekiqUniqueJobs
 
       def release_stale_locks!
         return unless check_staleness?
-        if SidekiqUniqueJobs.redis_version >= "3.2"
-          release_stale_locks_new!
+
+        if SidekiqUniqueJobs.redis_version >= '3.2'
+          release_stale_locks_lua!
         else
-          release_stale_locks_old!
+          release_stale_locks_ruby!
         end
       end
 
       private
 
-      def release_stale_locks_new!
+      def release_stale_locks_lua!
         SidekiqUniqueJobs::Scripts.call(
           :release_stale_locks,
           @redis_pool,
@@ -179,15 +180,13 @@ module SidekiqUniqueJobs
         )
       end
 
-      def release_stale_locks_old!
+      def release_stale_locks_ruby!
         SidekiqUniqueJobs.connection(@redis_pool) do |conn|
           simple_expiring_mutex(conn) do
             conn.hgetall(grabbed_key).each do |token, locked_at|
               timed_out_at = locked_at.to_f + @stale_client_timeout
 
-              if timed_out_at < current_time.to_f
-                signal(conn, token)
-              end
+              signal(conn, token) if timed_out_at < current_time.to_f
             end
           end
         end
@@ -199,31 +198,28 @@ module SidekiqUniqueJobs
 
         cached_current_time = current_time.to_f
         my_lock_expires_at = cached_current_time + EXPIRES_IN + 1
+        return false unless create_mutex(conn, my_lock_expires_at, cached_current_time)
 
-        got_lock = conn.setnx(release_key, my_lock_expires_at)
+        yield
+      ensure
+        # Make sure not to delete the lock in case someone else already expired
+        # our lock, with one second in between to account for some lag.
+        conn.del(release_key) if my_lock_expires_at > (current_time.to_f - 1)
+      end
 
-        if !got_lock
-          # Check if expired
-          other_lock_expires_at = conn.get(release_key).to_f
+      def create_mutex(conn, my_lock_expires_at, cached_current_time)
+        # return true if we got the lock
+        return true if conn.setnx(release_key, my_lock_expires_at)
 
-          if other_lock_expires_at < cached_current_time
-            old_expires_at = conn.getset(release_key, my_lock_expires_at).to_f
+        # Check if expired
+        other_lock_expires_at = conn.get(release_key).to_f
 
-            # Check if another client started cleanup yet. If not,
-            # then we now have the lock.
-            got_lock = (old_expires_at == other_lock_expires_at)
-          end
-        end
+        return false unless other_lock_expires_at < cached_current_time
 
-        return false if !got_lock
-
-        begin
-          yield
-        ensure
-          # Make sure not to delete the lock in case someone else already expired
-          # our lock, with one second in between to account for some lag.
-          conn.del(release_key) if my_lock_expires_at > (current_time.to_f - 1)
-        end
+        old_expires_at = conn.getset(release_key, my_lock_expires_at).to_f
+        # Check if another client started cleanup yet. If not,
+        # then we now have the lock.
+        old_expires_at == other_lock_expires_at
       end
 
       def expire_when_necessary(conn)
