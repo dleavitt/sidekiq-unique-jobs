@@ -1,5 +1,4 @@
 require 'simplecov-json'
-require 'codeclimate-test-reporter'
 
 SimpleCov.command_name 'RSpec'
 SimpleCov.refuse_coverage_drop
