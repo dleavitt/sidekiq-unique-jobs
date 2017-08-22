@@ -1,7 +1,6 @@
 require 'simplecov-json'
 require 'codeclimate-test-reporter'
 
-SimpleCov.command_name 'rspec'
 SimpleCov.refuse_coverage_drop
 SimpleCov.formatters = [
   SimpleCov::Formatter::HTMLFormatter,
