@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 module SidekiqUniqueJobs
-  module Lock
+  class Lock
     # rubocop:disable ClassLength
     class WhileExecuting
       EXISTS_TOKEN = '1'
@@ -21,18 +21,16 @@ module SidekiqUniqueJobs
         @item = item
         @name = unique_digest
         @redis_pool = opts.delete(:redis_pool)
-        @expiration = opts.delete(:expiration)
+        @expiration = opts.delete(:expiration) { @item[EXPIRATION_KEY] }
         @resource_count = opts.delete(:resources) || 1
-        @stale_client_timeout = opts.delete(:stale_client_timeout) do
-          RunLockTimeoutCalculator.for_item(@item).seconds
-        end
+        @stale_client_timeout = opts.delete(:stale_client_timeout)
         @use_local_time = opts.delete(:use_local_time)
         @tokens = []
       end
 
       def exists_or_create!
         SidekiqUniqueJobs::Scripts.call(
-          :create,
+          :exists_or_create,
           @redis_pool,
           keys: [exists_key, grabbed_key, available_key, version_key],
           argv: [EXISTS_TOKEN, @resource_count, @expiration, API_VERSION],
@@ -98,7 +96,7 @@ module SidekiqUniqueJobs
       alias synchronize lock
 
       def execute(_callback)
-        lock do
+        lock(Timeout::RunLock.new(@item).seconds) do
           yield
         end
       end

@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 module SidekiqUniqueJobs
-  module Lock
+  class Lock
     class UntilExecuted
       OK ||= 'OK'
 
@@ -56,7 +56,7 @@ module SidekiqUniqueJobs
       end
 
       def max_lock_time
-        @max_lock_time ||= QueueLockTimeoutCalculator.for_item(item).seconds
+        @max_lock_time ||= Timeout::QueueLock.new(item).seconds
       end
 
       def after_yield_yield

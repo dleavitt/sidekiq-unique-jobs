@@ -10,6 +10,7 @@ module SidekiqUniqueJobs
   HASH_KEY ||= 'uniquejobs'
   QUEUE_LOCK_TIMEOUT_KEY ||= 'unique_expiration'
   RUN_LOCK_TIMEOUT_KEY ||= 'run_lock_expiration'
+  EXPIRATION_KEY ||= 'expiration'
   TESTING_CONSTANT ||= 'Testing'
   UNIQUE_KEY ||= 'unique'
   UNIQUE_LOCK_KEY ||= 'unique_lock'

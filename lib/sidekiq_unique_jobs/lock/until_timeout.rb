@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 module SidekiqUniqueJobs
-  module Lock
+  class Lock
     class UntilTimeout < UntilExecuted
       def unlock(scope)
         return true if scope.to_sym == :server

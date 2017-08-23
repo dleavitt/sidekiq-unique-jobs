@@ -2,7 +2,7 @@
 
 require 'spec_helper'
 
-RSpec.describe SidekiqUniqueJobs::TimeoutCalculator do
+RSpec.describe SidekiqUniqueJobs::Timeout::Calculator do
   let(:calculator)    { described_class.new('class' => worker_class, 'at' => schedule_time) }
   let(:worker_class)  { 'MyUniqueJob' }
   let(:schedule_time) { nil }
@@ -15,13 +15,6 @@ RSpec.describe SidekiqUniqueJobs::TimeoutCalculator do
     it { is_expected.to respond_to(:worker_class_run_lock_expiration) }
     it { is_expected.to respond_to(:worker_class) }
     it { is_expected.to respond_to(:seconds) }
-  end
-
-  describe '.for_item' do
-    it 'initializes a new calculator' do
-      expect(described_class).to receive(:new).with('WAT')
-      described_class.for_item('WAT')
-    end
   end
 
   describe '#time_until_scheduled' do
