@@ -127,7 +127,7 @@ processed then just set `unique: :until_timeout`.
 You can also control the expiration length of the uniqueness check. If you want to enforce uniqueness over a longer period than the default of 30 minutes then you can pass the number of seconds you want to use to the sidekiq options:
 
 ```ruby
-sidekiq_options unique: :until_timeout, unique_expiration: 120 * 60 # 2 hours
+sidekiq_options unique: :until_timeout, expiration: 120 * 60 # 2 hours
 ```
 
 For locking modes (`:while_executing` and `:until_and_while_executing`) you can control the expiration length of the runtime uniqueness. If you want to enforce uniqueness over a longer period than the default of 60 seconds, then you can pass the number of seconds you want to use to the sidekiq options:
@@ -246,9 +246,6 @@ Start the console with the following command `bundle exec jobs console`.
 
 #### Remove Unique Keys
 `del '*', 100, false` the dry_run and count parameters are both required. This is to have some type of protection against clearing out all uniqueness.
-
-#### Expire
-`expire` clears the unique hash from expired keys
 
 ### Command Line
 
