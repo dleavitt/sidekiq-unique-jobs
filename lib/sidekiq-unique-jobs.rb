@@ -4,6 +4,7 @@ require 'yaml' if RUBY_VERSION.include?('2.0.0')
 require 'forwardable'
 require 'sidekiq_unique_jobs/version'
 require 'sidekiq_unique_jobs/constants'
+require 'sidekiq_unique_jobs/exceptions'
 require 'sidekiq_unique_jobs/util'
 require 'sidekiq_unique_jobs/cli'
 require 'sidekiq_unique_jobs/core_ext'

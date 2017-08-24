@@ -5,12 +5,6 @@ require 'digest/sha1'
 require 'concurrent/map'
 
 module SidekiqUniqueJobs
-  ScriptError         = Class.new(StandardError)
-  UniqueKeyMissing    = Class.new(ArgumentError)
-  JidMissing          = Class.new(ArgumentError)
-  MaxLockTimeMissing  = Class.new(ArgumentError)
-  UnexpectedValue     = Class.new(StandardError)
-
   module Scripts
     LUA_PATHNAME ||= Pathname.new(__FILE__).dirname.join('../../redis').freeze
     SOURCE_FILES ||= Dir[LUA_PATHNAME.join('**/*.lua')].compact.freeze

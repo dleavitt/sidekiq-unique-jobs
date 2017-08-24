@@ -15,14 +15,27 @@ module SidekiqUniqueJobs
       end
 
       def execute(callback = nil)
-        @lock.lock(Timeout::RunLock.new(@item).seconds) do
+        performed = @lock.lock(timeout) do
           yield
           callback.call
         end
+
+        fail_with_lock_timeout! unless performed
       end
 
       def unlock
         @lock.unlock
+      end
+
+      private
+
+      def timeout
+        @timeout ||= Timeout::RunLock.new(@item).seconds
+      end
+
+      def fail_with_lock_timeout!
+        raise(SidekiqUniqueJobs::LockTimeout,
+              "couldn't achieve lock for #{@lock.available_key} within: #{timeout} seconds")
       end
     end
   end
