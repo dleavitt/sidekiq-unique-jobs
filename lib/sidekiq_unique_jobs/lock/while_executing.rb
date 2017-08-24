@@ -2,7 +2,6 @@
 
 module SidekiqUniqueJobs
   class Lock
-    # rubocop:disable ClassLength
     class WhileExecuting
       def initialize(item, redis_pool = nil)
         @item = item
@@ -11,7 +10,7 @@ module SidekiqUniqueJobs
         @lock ||= SidekiqUniqueJobs::Lock.new(@item)
       end
 
-      def lock(scope)
+      def lock(_scope)
         true
       end
 

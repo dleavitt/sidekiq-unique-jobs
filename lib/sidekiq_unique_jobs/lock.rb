@@ -1,8 +1,7 @@
 # frozen_string_literal: true
 
-
 module SidekiqUniqueJobs
-  class Lock
+  class Lock # rubocop:disable ClassLength
     EXISTS_TOKEN = '1'
     API_VERSION = '1'
     EXPIRES_IN = 10
@@ -61,7 +60,7 @@ module SidekiqUniqueJobs
       end
     end
 
-    def lock(timeout = nil) # rubocop:disable xMetrics/MethodLength
+    def lock(timeout = nil) # rubocop:disable Metrics/MethodLength
       exists_or_create!
       release_stale_locks!
 

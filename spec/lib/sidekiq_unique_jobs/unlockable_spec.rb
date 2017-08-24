@@ -24,7 +24,7 @@ RSpec.describe SidekiqUniqueJobs::Unlockable do
 
     specify do
       expect(SidekiqUniqueJobs::Util.keys.count).to eq(0)
-      jid = Sidekiq::Client.push(item_with_digest)
+      Sidekiq::Client.push(item_with_digest)
 
       expect(SidekiqUniqueJobs::Util.keys.count).to eq(3)
       expect(SidekiqUniqueJobs::Util.keys).to match_array(expected_keys)

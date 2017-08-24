@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 module SidekiqUniqueJobs
-  module Util # rubocop:disable Metrics/ModuleLength
+  module Util
     COUNT             = 'COUNT'
     DEFAULT_COUNT     = 1_000
     EXPIRE_BATCH_SIZE = 100

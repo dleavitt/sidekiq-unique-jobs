@@ -70,7 +70,7 @@ RSpec.describe SidekiqUniqueJobs::Cli, ruby_ver: '>= 2.4' do
   let(:item) do
     {
       'jid'           => jid,
-      'unique_digest' => unique_key
+      'unique_digest' => unique_key,
     }
   end
 
