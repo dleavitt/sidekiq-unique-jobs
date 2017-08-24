@@ -9,14 +9,14 @@ require 'sidekiq_unique_jobs/sidekiq_unique_ext'
 
 RSpec.describe 'Sidekiq::Api' do
   let(:item) do
-    { 'class' => JustAWorker,
+    { 'class' => 'JustAWorker',
       'queue' => 'testqueue',
       'args'  => [foo: 'bar'] }
   end
 
   def unique_key
     SidekiqUniqueJobs::UniqueArgs.digest(
-      'class' => JustAWorker,
+      'class' => 'JustAWorker',
       'queue' => 'testqueue',
       'args'  => [foo: 'bar'],
       'at'    => (Date.today + 1).to_time.to_i,
@@ -32,12 +32,23 @@ RSpec.describe 'Sidekiq::Api' do
   end
 
   describe Sidekiq::SortedEntry::UniqueExtension do
+    let(:expected_keys) do
+      %w[
+        schedule
+        uniquejobs:863b7cb639bd71c828459b97788b2ada:EXISTS
+        uniquejobs:863b7cb639bd71c828459b97788b2ada:GRABBED
+        uniquejobs:863b7cb639bd71c828459b97788b2ada:VERSION
+      ]
+    end
     it 'deletes uniqueness lock on delete' do
       expect(schedule_job).to be_truthy
+      Sidekiq.redis do |conn|
+        expect(conn.keys).to match_array(expected_keys)
+      end
 
       Sidekiq::ScheduledSet.new.each(&:delete)
       Sidekiq.redis do |conn|
-        expect(conn.exists(unique_key)).to be_falsy
+        expect(conn.keys).to match_array([])
       end
 
       expect(schedule_job).to be_truthy

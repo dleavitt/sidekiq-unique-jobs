@@ -2,5 +2,5 @@
 
 class ExpiringJob
   include Sidekiq::Worker
-  sidekiq_options unique: :until_executed, unique_expiration: 10 * 60
+  sidekiq_options unique: :until_executed, expiration: 10 * 60
 end

@@ -28,8 +28,6 @@ module SidekiqUniqueJobs
 
     def lock_class
       @lock_class ||= LOCKS[unique_lock.to_sym]
-      @lock_class || (puts unique_lock)
-      @lock_class
     end
 
     def unique_lock

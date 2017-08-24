@@ -16,14 +16,14 @@ module SidekiqUniqueJobs
     # SidekiqUniqueJobs::Lock::WhileExecuting.new(item, :resources => 1, :redis => myRedis)
     # SidekiqUniqueJobs::Lock::WhileExecuting.new(item, :host => "", :port => "")
     # SidekiqUniqueJobs::Lock::WhileExecuting.new(item, :path => "bla")
-    def initialize(item, opts = {})
+    def initialize(item, redis_pool = nil)
       @item = item
       @name = unique_digest
-      @redis_pool = opts.delete(:redis_pool)
-      @expiration = opts.delete(:expiration)
-      @resource_count = opts.delete(:resources) || 1
-      @stale_client_timeout = opts.delete(:stale_client_timeout)
-      @use_local_time = opts.delete(:use_local_time)
+      @redis_pool = redis_pool
+      @expiration = @item[SidekiqUniqueJobs::EXPIRATION_KEY]
+      @resource_count = @item[SidekiqUniqueJobs::RESOURCES_KEY] || 1
+      @stale_client_timeout = @item[SidekiqUniqueJobs::STALE_CLIENT_TIMEOUT_KEY]
+      @use_local_time = @item[SidekiqUniqueJobs::USE_LOCAL_TIME_KEY]
       @tokens = []
     end
 
@@ -61,8 +61,7 @@ module SidekiqUniqueJobs
       end
     end
 
-    def lock(timeout = nil) # rubocop:disable Metrics/MethodLength
-      return true if timeout == :client
+    def lock(timeout = nil) # rubocop:disable xMetrics/MethodLength
       exists_or_create!
       release_stale_locks!
 

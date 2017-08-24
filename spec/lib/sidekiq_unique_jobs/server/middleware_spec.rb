@@ -74,7 +74,9 @@ RSpec.describe SidekiqUniqueJobs::Server::Middleware do
 
         middleware.call(worker, item, QUEUE) do
           Sidekiq.redis do |conn|
-            expect(conn.ttl(digest_for(item))).to eq(-2) # key does not exist
+            conn.keys('unique:*').each do |key|
+              expect(conn.ttl(key)).to eq(-2) # key does not exist
+            end
           end
         end
       end
@@ -87,7 +89,11 @@ RSpec.describe SidekiqUniqueJobs::Server::Middleware do
 
         middleware.call('UntilExecutedJob', item, QUEUE) do
           Sidekiq.redis do |conn|
-            expect(conn.get(digest_for(item))).to eq jid
+            Sidekiq.redis do |conn|
+              conn.keys('unique:*').each do |key|
+                expect(conn.get(key)).to eq(-2) # key does not exist
+              end
+            end
           end
         end
       end

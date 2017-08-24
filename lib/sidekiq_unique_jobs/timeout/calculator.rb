@@ -8,9 +8,8 @@ module SidekiqUniqueJobs
       end
 
       def time_until_scheduled
-        scheduled = item[AT_KEY]
-        return 0 unless scheduled
-        (Time.at(scheduled) - Time.now.utc).to_i
+        return 0 unless item[AT_KEY]
+        (Time.at(item[AT_KEY]) - Time.now.utc).to_i
       end
 
       def seconds

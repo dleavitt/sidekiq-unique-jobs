@@ -67,8 +67,8 @@ module Sidekiq
       end
 
       def delete_ext
-        SidekiqUniqueJobs::Unlockable.unlock(item)
         delete_orig
+        SidekiqUniqueJobs::Unlockable.unlock(item)
       end
     end
 

@@ -3,8 +3,6 @@
 require 'pathname'
 require 'digest/sha1'
 require 'concurrent/map'
-require 'sidekiq_unique_jobs/scripts/acquire_lock'
-require 'sidekiq_unique_jobs/scripts/release_lock'
 
 module SidekiqUniqueJobs
   ScriptError         = Class.new(StandardError)

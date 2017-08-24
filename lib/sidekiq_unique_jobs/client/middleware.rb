@@ -17,14 +17,15 @@ module SidekiqUniqueJobs
         @queue = queue
         @redis_pool = redis_pool
 
-        yield if disabled_or_successfully_locked?
+
+        yield if successfully_locked?
       end
 
       private
 
       attr_reader :item, :worker_class, :redis_pool, :queue
 
-      def disabled_or_successfully_locked?
+      def successfully_locked?
         unique_disabled? || acquire_lock
       end
 

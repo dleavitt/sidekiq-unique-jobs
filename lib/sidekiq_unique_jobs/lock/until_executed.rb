@@ -11,8 +11,9 @@ module SidekiqUniqueJobs
       def_delegators :Sidekiq, :logger
 
       def initialize(item, redis_pool = nil)
-        @item = item
+        @item = item.merge('expiration' => Timeout::QueueLock.new(item).seconds)
         @redis_pool = redis_pool
+        @lock ||= SidekiqUniqueJobs::Lock.new(@item, @redis_pool)
       end
 
       def execute(callback, &blk)
@@ -34,7 +35,7 @@ module SidekiqUniqueJobs
           raise ArgumentError, "#{scope} middleware can't #{__method__} #{unique_key}"
         end
 
-        unlock_by_key(unique_key, item[JID_KEY], redis_pool)
+        @lock.unlock
       end
 
       def lock(scope)
@@ -42,30 +43,17 @@ module SidekiqUniqueJobs
           raise ArgumentError, "#{scope} middleware can't #{__method__} #{unique_key}"
         end
 
-        Scripts::AcquireLock.execute(
-          redis_pool,
-          unique_key,
-          item[JID_KEY],
-          max_lock_time,
-        )
+        @lock.lock(0)
       end
       # rubocop:enable MethodLength
 
       def unique_key
-        @unique_key ||= UniqueArgs.digest(item)
-      end
-
-      def max_lock_time
-        @max_lock_time ||= Timeout::QueueLock.new(item).seconds
+        @unique_key ||= UniqueArgs.digest(@item)
       end
 
       def after_yield_yield
         yield
       end
-
-      private
-
-      attr_reader :item, :redis_pool
     end
   end
 end

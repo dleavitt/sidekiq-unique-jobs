@@ -12,7 +12,6 @@ RSpec.describe SidekiqUniqueJobs::Cli, ruby_ver: '>= 2.4' do
         Commands:
           jobs  console         # drop into a console with easy access to helper methods
           jobs  del PATTERN     # deletes unique keys from redis by pattern
-          jobs  expire          # removes all expired unique keys from the hash in redis
           jobs  help [COMMAND]  # Describe available commands or one specific command
           jobs  keys PATTERN    # list all unique keys and their expiry time
       EOS
@@ -43,23 +42,6 @@ RSpec.describe SidekiqUniqueJobs::Cli, ruby_ver: '>= 2.4' do
       end
     end
 
-    describe '#help expire' do
-      let(:output) { capture(:stdout) { described_class.start(%w[help expire]) } }
-
-      let(:banner) do
-        <<~EOS
-          Usage:
-            jobs  expire
-
-          removes all expired unique keys from the hash in redis
-        EOS
-      end
-
-      it 'displays help about the `expire` command' do
-        expect(output).to eq(banner)
-      end
-    end
-
     describe '#help keys' do
       let(:output) { capture(:stdout) { described_class.start(%w[help keys]) } }
       let(:banner) do
@@ -81,10 +63,16 @@ RSpec.describe SidekiqUniqueJobs::Cli, ruby_ver: '>= 2.4' do
     end
   end
 
-  let(:pattern) { '*' }
+  let(:pattern)       { '*' }
   let(:max_lock_time) { 1 }
-  let(:unique_key) { 'uniquejobs:abcdefab' }
-  let(:jid) { 'abcdefab' }
+  let(:unique_key)    { 'uniquejobs:abcdefab' }
+  let(:jid)           { 'abcdefab' }
+  let(:item) do
+    {
+      'jid'           => jid,
+      'unique_digest' => unique_key
+    }
+  end
 
   describe '.keys' do
     let(:output) { capture(:stdout) { described_class.start(%w[keys * --count 1000]) } }
@@ -95,16 +83,8 @@ RSpec.describe SidekiqUniqueJobs::Cli, ruby_ver: '>= 2.4' do
     end
 
     context 'when a key exists' do
-      let(:keys) { ['defghayl', jid, 'poilkij'].sort }
       before do
-        keys.each do |jid|
-          unique_key = "uniquejobs:#{jid}"
-          SidekiqUniqueJobs::Scripts::AcquireLock.execute(nil, unique_key, jid, 20)
-          expect(SidekiqUniqueJobs)
-            .to have_key(unique_key)
-            .for_seconds(20)
-            .with_value(jid)
-        end
+        SidekiqUniqueJobs::Lock.new(item).lock
       end
 
       after { SidekiqUniqueJobs::Util.del('*', 1000, false) }
@@ -112,7 +92,7 @@ RSpec.describe SidekiqUniqueJobs::Cli, ruby_ver: '>= 2.4' do
       let(:expected) do
         <<~EOS
           Found 3 keys matching '#{pattern}':
-          uniquejobs:abcdefab  uniquejobs:defghayl  uniquejobs:poilkij
+          uniquejobs:abcdefab:EXISTS   uniquejobs:abcdefab:GRABBED  uniquejobs:abcdefab:VERSION
         EOS
       end
       specify do
@@ -124,44 +104,18 @@ RSpec.describe SidekiqUniqueJobs::Cli, ruby_ver: '>= 2.4' do
   describe '.del' do
     let(:expected) do
       <<~EOS
-        Deleted 1 keys matching '*'
+        Deleted 3 keys matching '*'
       EOS
     end
 
     before do
-      SidekiqUniqueJobs::Scripts::AcquireLock.execute(nil, unique_key, jid, max_lock_time)
-      expect(SidekiqUniqueJobs)
-        .to have_key(unique_key)
-        .for_seconds(1)
-        .with_value(jid)
+      SidekiqUniqueJobs::Lock.new(item).lock
     end
 
     specify do
       output = capture(:stdout) { described_class.start(%w[del * --no-dry-run --count 1000]) }
       expect(output).to eq(expected)
-      expect(SidekiqUniqueJobs).not_to have_key(unique_key)
-    end
-  end
-
-  describe '.expire' do
-    before do
-      SidekiqUniqueJobs::Scripts::AcquireLock.execute(nil, unique_key, jid, max_lock_time)
-      expect(SidekiqUniqueJobs)
-        .to have_key(unique_key)
-        .for_seconds(1)
-        .with_value(jid)
-    end
-    let(:expected) do
-      <<~EOS
-        Removed 1 left overs from redis.
-        uniquejobs:abcdefab
-      EOS
-    end
-
-    specify do
-      sleep 1
-      output = capture(:stdout) { described_class.start(%w[expire]) }
-      expect(output).to eq(expected)
+      expect(SidekiqUniqueJobs::Util.keys).to eq([])
     end
   end
 
@@ -177,7 +131,7 @@ RSpec.describe SidekiqUniqueJobs::Cli, ruby_ver: '>= 2.4' do
 
     specify do
       expect(Object).to receive(:include).with(SidekiqUniqueJobs::Util).and_return(true)
-      allow(IRB).to receive(:start).and_return(true)
+      allow(Pry).to receive(:start).and_return(true)
       expect(output).to eq(expected)
     end
   end

@@ -6,11 +6,9 @@ module SidekiqUniqueJobs
       def execute(callback)
         unlock(:server)
 
-        runtime_lock.lock do
+        runtime_lock.execute(callback) do
           yield
         end
-
-        callback.call
       end
 
       def runtime_lock

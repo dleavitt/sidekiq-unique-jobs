@@ -35,7 +35,7 @@ RSpec.describe SidekiqUniqueJobs::Lock::UntilAndWhileExecuting, redis_db: 2 do
         10.times { Sidekiq::Client.push(item) }
 
         Sidekiq.redis do |conn|
-          expect(conn.keys('uniquejobs:*').size).to eq(4)
+          expect(conn.keys('uniquejobs:*').size).to eq(3)
         end
       end
 

@@ -18,7 +18,12 @@ RSpec.describe SidekiqUniqueJobs::Client::Middleware, redis_db: 1 do
           expect(jid).not_to eq(nil)
           Sidekiq.redis do |conn|
             expect(conn.zcard('schedule')).to eq(1)
-            expected = %w[schedule uniquejobs:6e47d668ad22db2a3ba0afd331514ce2 uniquejobs]
+            expected = %w[
+              schedule
+              uniquejobs:6e47d668ad22db2a3ba0afd331514ce2:EXISTS
+              uniquejobs:6e47d668ad22db2a3ba0afd331514ce2:GRABBED
+              uniquejobs:6e47d668ad22db2a3ba0afd331514ce2:VERSION
+            ]
             expect(conn.keys).to match_array(expected)
           end
           sleep 1
@@ -189,8 +194,12 @@ RSpec.describe SidekiqUniqueJobs::Client::Middleware, redis_db: 1 do
 
       Sidekiq.redis do |conn|
         expect(conn.llen('queue:customqueue')).to eq(1)
-        expect(conn.ttl(digest_for(item)))
-          .to eq(ExpiringJob.get_sidekiq_options['unique_expiration'])
+
+        conn.keys('uniquejobs:*').each do |key|
+          next if key.end_with?(':GRABBED')
+
+          expect(conn.ttl(key)).to be_within(1).of(ExpiringJob.get_sidekiq_options['expiration'])
+        end
       end
     end
 
@@ -281,14 +290,14 @@ RSpec.describe SidekiqUniqueJobs::Client::Middleware, redis_db: 1 do
       expected_expires_at =
         (Time.at(Time.now.to_i + 15 * 60) - Time.now.utc) +
         SidekiqUniqueJobs.config.default_queue_lock_expiration
-      jid = MyUniqueJob.perform_in(expected_expires_at, 'mike')
-      item = { 'class' => MyUniqueJob,
-               'queue' => 'customqueue',
-               'args' => ['mike'],
-               'at' => expected_expires_at }
-      digest = digest_for(item.merge('jid' => jid))
+
+      MyUniqueJob.perform_in(expected_expires_at, 'mike')
+
       Sidekiq.redis do |conn|
-        expect(conn.ttl(digest)).to be_within(1).of(9_899)
+        conn.keys('uniquejobs:*').each do |key|
+          next if key.end_with?(':GRABBED')
+          expect(conn.ttl(key)).to be_within(1).of(9_899)
+        end
       end
     end
 
@@ -329,7 +338,7 @@ RSpec.describe SidekiqUniqueJobs::Client::Middleware, redis_db: 1 do
     let(:queue) { 'default' }
     context 'when ordinary_or_locked?' do
       before do
-        allow(subject).to receive(:disabled_or_successfully_locked?).and_return(false)
+        allow(subject).to receive(:successfully_locked?).and_return(false)
       end
 
       it 'returns nil' do

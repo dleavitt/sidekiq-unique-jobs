@@ -61,7 +61,7 @@ RSpec.describe SidekiqUniqueJobs::ScriptMock, ruby_ver: '>= 2.4.1' do
         expect(SidekiqUniqueJobs)
           .to have_key(unique_key)
           .for_seconds(1)
-          .with_value('fuckit')
+          .with_value('0')
         sleep 1
         expect(acquire_lock).to eq(1)
       end

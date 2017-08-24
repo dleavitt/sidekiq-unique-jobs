@@ -131,13 +131,6 @@ RSpec.describe 'When Sidekiq::Testing is enabled' do
       InlineWorker.perform_async('test')
     end
 
-    # it 'if the unique is kept forever it does not allows to run the job again' do
-    #   expect(TestClass).to receive(:run).with('args').once
-
-    #   UntilGlobalTimeoutJob.perform_async('args')
-    #   UntilGlobalTimeoutJob.perform_async('args')
-    # end
-
     describe 'when a job is set to run once in 10 minutes' do
       context 'when spammed' do
         it 'only allows 1 call per 10 minutes' do
