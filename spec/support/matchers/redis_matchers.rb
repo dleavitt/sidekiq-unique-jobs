@@ -6,7 +6,6 @@ RSpec::Matchers.define :have_key do |unique_key|
   Sidekiq.redis do |conn|
     match do |_unique_jobs|
       @exists_key  = "#{unique_key}:EXISTS"
-      @version_key = "#{unique_key}:VERSION"
       @value       = conn.get(@exists_key)
       @ttl         = conn.ttl(@exists_key)
 

@@ -16,7 +16,9 @@ module SidekiqUniqueJobs
         @item = item
         return yield if unique_disabled?
 
-        lock.send(:execute, after_unlock_hook, &blk)
+        lock.execute(after_unlock_hook) do
+          yield
+        end
       end
 
       private

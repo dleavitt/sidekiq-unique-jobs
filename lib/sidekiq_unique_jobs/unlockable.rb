@@ -8,6 +8,12 @@ module SidekiqUniqueJobs
       SidekiqUniqueJobs::UniqueArgs.digest(item)
       lock = SidekiqUniqueJobs::Lock.new(item)
       lock.unlock
+    end
+
+    def delete!(item)
+      digest = SidekiqUniqueJobs::UniqueArgs.digest(item)
+      lock = SidekiqUniqueJobs::Lock.new(item)
+      lock.unlock
       lock.delete!
     end
 

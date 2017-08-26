@@ -1,5 +1,11 @@
 # frozen_string_literal: true
 
 class PlainClass
-  def run(*); end
+  def self.run(one)
+    [one]
+  end
+
+  def run(one)
+    [one]
+  end
 end

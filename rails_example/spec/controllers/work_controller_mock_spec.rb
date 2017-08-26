@@ -4,7 +4,7 @@ require 'rails_helper'
 
 MOCK_REDIS = MockRedis.new
 
-describe WorkController, 'with mock redis', redis: :mock_redised do
+describe WorkController, 'with mock redis', redis: :mock_redis do
   describe 'GET /work/duplicate_simple' do
     context 'when test mode is fake', sidekiq: :fake do
       specify do
@@ -20,7 +20,6 @@ describe WorkController, 'with mock redis', redis: :mock_redised do
         %w[
           uniquejobs:5f0092e13b3956c663a91d0d05d10a4b:EXISTS
           uniquejobs:5f0092e13b3956c663a91d0d05d10a4b:GRABBED
-          uniquejobs:5f0092e13b3956c663a91d0d05d10a4b:VERSION
         ]
       end
 

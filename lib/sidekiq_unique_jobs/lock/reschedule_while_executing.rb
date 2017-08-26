@@ -17,7 +17,7 @@ module SidekiqUniqueJobs
       end
 
       def unlock
-        @lock.unlock
+        @lock.unlock('0')
       end
     end
   end

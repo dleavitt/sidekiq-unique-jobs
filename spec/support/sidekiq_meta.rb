@@ -1,9 +1,9 @@
 # frozen_string_literal: true
 
 RSpec.configure do |config|
-  config.before(:each, redis: :mock_redised) do
+  config.before(:each, redis: :mock_redis) do
     require 'mock_redis'
-    MOCK_REDIS ||= MockRedis.new
+    mock_redis = MockRedis.new
     SidekiqUniqueJobs.configure do |config|
       config.redis_test_mode = :mock
     end
@@ -11,16 +11,7 @@ RSpec.configure do |config|
     allow(SidekiqUniqueJobs).to receive(:redis_version).and_return('0.0')
     Sidekiq::Worker.clear_all
 
-    keys = MOCK_REDIS.keys
-    if keys.respond_to?(:each)
-      keys.each do |key|
-        MOCK_REDIS.del(key)
-      end
-    else
-      MOCK_REDIS.del(keys)
-    end
-
-    allow(Sidekiq).to receive(:redis).and_yield(MOCK_REDIS)
+    allow(Sidekiq).to receive(:redis).and_yield(mock_redis)
   end
 
   config.before(:each, redis: :redis) do |example|
@@ -73,7 +64,7 @@ RSpec.configure do |config|
     end
   end
 
-  config.after(:each, redis: :mock_redised) do
+  config.after(:each, redis: :mock_redis) do
     SidekiqUniqueJobs.configure do |config|
       config.redis_test_mode = :redis
     end

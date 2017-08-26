@@ -5,8 +5,7 @@ module SidekiqUniqueJobs
     COUNT             = 'COUNT'
     DEFAULT_COUNT     = 1_000
     EXPIRE_BATCH_SIZE = 100
-    MATCH             = 'MATCH'
-    SCAN_METHOD       = 'scan'
+    SCAN_METHOD       = 'SCAN'
     SCAN_PATTERN      = '*'
 
     extend self # rubocop:disable Style/ModuleFunction
@@ -15,6 +14,14 @@ module SidekiqUniqueJobs
       connection { |conn| conn.scan_each(match: prefix(pattern), count: count).to_a }
     end
 
+    # Deletes unique keys from redis
+    #
+    #
+    # @param pattern [String] a pattern to scan for in redis
+    # @param count [Integer] the maximum number of keys to delete
+    # @param dry_run [Boolean] set to false to perform deletion, `true` or `false`
+    # @return [Boolean] report success
+    # @raise [SidekiqUniqueJobs::LockTimeout] when lock fails within configured timeout
     def del(pattern = SCAN_PATTERN, count = 0, dry_run = true)
       raise ArgumentError, 'Please provide a number of keys to delete greater than zero' if count.zero?
       pattern = "#{pattern}:*" unless pattern.end_with?(':*')
@@ -76,10 +83,6 @@ module SidekiqUniqueJobs
 
     def connection(&block)
       SidekiqUniqueJobs.connection(&block)
-    end
-
-    def redis_version
-      SidekiqUniqueJobs.redis_version
     end
 
     def logger

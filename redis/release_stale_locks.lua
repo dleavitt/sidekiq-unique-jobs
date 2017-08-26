@@ -3,8 +3,7 @@ redis.replicate_commands();
 local exists_key           = KEYS[1]
 local grabbed_key          = KEYS[2]
 local available_key        = KEYS[3]
-local version_key          = KEYS[4]
-local lock_key             = KEYS[5]
+local lock_key             = KEYS[4]
 
 local expires_in           = tonumber(ARGV[1])
 local stale_client_timeout = tonumber(ARGV[2])
@@ -75,8 +74,6 @@ for key, locked_at in pairs(keys) do
       redis.call('EXPIRE', available_key, expiration)
       redis.log(redis.LOG_DEBUG, "release_stale_locks.lua - EXPIRE " .. exists_key .. " with " .. expiration)
       redis.call('EXPIRE', exists_key, expiration)
-      redis.log(redis.LOG_DEBUG, "release_stale_locks.lua - EXPIRE " .. version_key .. " with " .. expiration)
-      redis.call('EXPIRE', version_key, expiration)
     end
   end
 end

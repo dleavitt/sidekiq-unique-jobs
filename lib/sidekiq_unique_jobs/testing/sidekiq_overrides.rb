@@ -7,8 +7,8 @@ module Sidekiq
     module ClassMethods
       # Clear all jobs for this worker
       def clear
-        jobs.each do |job|
-         SidekiqUniqueJobs::Unlockable.unlock(job) if Sidekiq::Testing.fake?
+        jobs.each do |item|
+         SidekiqUniqueJobs::Unlockable.delete!(item)
         end
 
         Sidekiq::Queues[queue].clear
@@ -35,8 +35,8 @@ module Sidekiq
 
       module Testing
         def clear_all_ext
-          SidekiqUniqueJobs::Util.del('*', 1000, false) unless SidekiqUniqueJobs.mocked?
           clear_all_orig
+          SidekiqUniqueJobs::Util.del('*', 1000, false)
         end
       end
     end

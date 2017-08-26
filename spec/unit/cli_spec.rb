@@ -91,8 +91,8 @@ RSpec.describe SidekiqUniqueJobs::Cli, redis: :redis, ruby_ver: '>= 2.4' do
 
       let(:expected) do
         <<~EOS
-          Found 3 keys matching '#{pattern}':
-          uniquejobs:abcdefab:EXISTS   uniquejobs:abcdefab:GRABBED  uniquejobs:abcdefab:VERSION
+          Found 2 keys matching '#{pattern}':
+          uniquejobs:abcdefab:EXISTS   uniquejobs:abcdefab:GRABBED
         EOS
       end
       specify do
@@ -104,7 +104,7 @@ RSpec.describe SidekiqUniqueJobs::Cli, redis: :redis, ruby_ver: '>= 2.4' do
   describe '.del' do
     let(:expected) do
       <<~EOS
-        Deleted 3 keys matching '*'
+        Deleted 2 keys matching '*'
       EOS
     end
 

@@ -16,7 +16,6 @@ module SidekiqUniqueJobs
         @item = item
         @queue = queue
         @redis_pool = redis_pool
-
         yield if successfully_locked?
       end
 

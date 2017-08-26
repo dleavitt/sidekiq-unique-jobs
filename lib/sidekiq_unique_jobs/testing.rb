@@ -28,40 +28,51 @@ module SidekiqUniqueJobs
         return exists_or_create_orig! unless SidekiqUniqueJobs.mocked?
 
         SidekiqUniqueJobs.connection do |conn|
-          token = conn.getset(exists_key, EXISTS)
+          current_token = conn.getset(exists_key, @current_jid)
 
-          if token
-            conn.set(version_key, API_VERSION) if conn.get(version_key).nil?
-            token
-          else
+          if current_token.nil?
             conn.expire(exists_key, 10)
 
             conn.multi do
               conn.del(grabbed_key)
               conn.del(available_key)
-              @lock_resources.times do |index|
-                conn.rpush(available_key, index)
-              end
-              conn.set(version_key, API_VERSION)
+              conn.rpush(available_key, @current_jid)
               conn.persist(exists_key)
 
               expire_when_necessary(conn)
             end
-            EXISTS
+
+            @current_jid
+          else
+            current_token
           end
         end
       end
 
-      def lock_ext(timeout = nil, &block) # rubocop:disable MethodLength
-        return lock_orig(timeout, &block) unless SidekiqUniqueJobs.mocked?
+      def lock_ext(timeout = nil) # rubocop:disable MethodLength
+        unless SidekiqUniqueJobs.mocked?
+          if block_given?
+            return lock_orig(timeout) do |token|
+              yield
+            end
+          else
+            return lock_orig(timeout)
+          end
+        end
 
         SidekiqUniqueJobs.connection(@redis_pool) do |conn|
           exists_or_create_ext!
           release_stale_locks!
-          current_token = conn.lpop(available_key)
-          return false if current_token.nil?
 
-          @tokens.push(current_token)
+          if timeout.nil? || timeout > 0
+            # passing timeout 0 to blpop causes it to block
+            _key, current_token = conn.blpop(available_key, timeout || 0)
+          else
+            current_token = conn.lpop(available_key)
+          end
+
+          return false if current_token != @current_jid
+
           conn.hset(grabbed_key, current_token, current_time.to_f)
           return_value = current_token
 
@@ -83,24 +94,25 @@ module SidekiqUniqueJobs
 
   module Client
     class Middleware
-      # alias call_real call
-      # def call(worker_class, item, queue, redis_pool = nil)
-      #   worker_class = SidekiqUniqueJobs.worker_class_constantize(worker_class)
+      alias call_real call
+      def call(worker_class, item, queue, redis_pool = nil)
+        worker_class = SidekiqUniqueJobs.worker_class_constantize(worker_class)
 
-      #   if Sidekiq::Testing.inline?
-      #     call_real(worker_class, item, queue, redis_pool) do
-      #       _server.call(worker_class.new, item, queue, redis_pool) do
-      #         yield
-      #       end
-      #     end
-      #   else
-      #     call_real(worker_class, item, queue, redis_pool) do
-      #       yield
-      #     end
-      #   end
-      # end
+        if Sidekiq::Testing.inline?
+          call_real(worker_class, item, queue, redis_pool) do
+            server_middleware.call(worker_class.new, item, queue, redis_pool) do
+              yield
+            end
+          end
+          # SidekiqUniqueJobs::Util.del('*', 1000, false)
+        else
+          call_real(worker_class, item, queue, redis_pool) do
+            yield
+          end
+        end
+      end
 
-      def _server
+      def server_middleware
         SidekiqUniqueJobs::Server::Middleware.new
       end
     end

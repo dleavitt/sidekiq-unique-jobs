@@ -31,7 +31,7 @@ module SidekiqUniqueJobs
       def lock(scope)
         validate_scope!(actual_scope: scope, expected_scope: :client)
 
-        @lock.lock(0)
+        @lock.lock(@calculator.lock_timeout)
       end
 
       def after_yield_yield

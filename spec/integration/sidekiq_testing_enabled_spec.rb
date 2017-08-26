@@ -128,8 +128,8 @@ RSpec.shared_examples 'sidekiq testing extensions are enabled' do
   describe 'when set to :inline!', sidekiq: :inline do
     it 'once the job is completed allows to run another one' do
       expect(TestClass).to receive(:run).with('test').twice
-      InlineWorker.perform_async('test')
-      InlineWorker.perform_async('test')
+      InlineWorker.perform_async('plosibubb')
+      InlineWorker.perform_async('plosibubb')
     end
 
     describe 'when a job is set to run once in 10 minutes' do
@@ -159,10 +159,10 @@ RSpec.shared_examples 'sidekiq testing extensions are enabled' do
   end
 end
 
-RSpec.describe 'When Sidekiq::Testing is enabled', redis: :mock_redis do
+RSpec.describe Sidekiq::Testing, 'with Redis', redis: :redis, redis_db: 12 do
   it_behaves_like 'sidekiq testing extensions are enabled'
 end
 
-RSpec.describe 'When Sidekiq::Testing is enabled', redis: :redis, redis_db: 12 do
+RSpec.describe Sidekiq::Testing, 'with MockRedis', redis: :mock_redis do
   it_behaves_like 'sidekiq testing extensions are enabled'
 end
