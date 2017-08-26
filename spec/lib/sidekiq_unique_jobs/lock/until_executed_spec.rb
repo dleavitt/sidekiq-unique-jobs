@@ -2,7 +2,7 @@
 
 require 'spec_helper'
 
-RSpec.describe SidekiqUniqueJobs::Lock::UntilExecuted, redis: :real do
+RSpec.describe SidekiqUniqueJobs::Lock::UntilExecuted, redis: :redis do
   describe '#execute' do
     subject { lock.execute(empty_callback) }
 

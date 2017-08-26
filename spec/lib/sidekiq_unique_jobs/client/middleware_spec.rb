@@ -5,7 +5,7 @@ require 'sidekiq/worker'
 require 'sidekiq-unique-jobs'
 require 'rspec/wait'
 
-RSpec.describe SidekiqUniqueJobs::Client::Middleware, redis: :real, redis_db: 1 do
+RSpec.describe SidekiqUniqueJobs::Client::Middleware, redis: :redis, redis_db: 1 do
   describe 'with real redis' do
     describe 'when a job is already scheduled' do
       it 'processes jobs properly' do

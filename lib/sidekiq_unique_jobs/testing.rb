@@ -28,9 +28,12 @@ module SidekiqUniqueJobs
         return exists_or_create_orig! unless SidekiqUniqueJobs.mocked?
 
         SidekiqUniqueJobs.connection do |conn|
-          token = conn.getset(exists_key, @item[JID_KEY])
+          token = conn.getset(exists_key, EXISTS)
 
-          if token.nil?
+          if token
+            conn.set(version_key, API_VERSION) if conn.get(version_key).nil?
+            token
+          else
             conn.expire(exists_key, 10)
 
             conn.multi do
@@ -44,9 +47,7 @@ module SidekiqUniqueJobs
 
               expire_when_necessary(conn)
             end
-          else
-            conn.set(version_key, API_VERSION) if conn.get(version_key).nil?
-            true
+            EXISTS
           end
         end
       end
@@ -55,7 +56,7 @@ module SidekiqUniqueJobs
         return lock_orig(timeout, &block) unless SidekiqUniqueJobs.mocked?
 
         SidekiqUniqueJobs.connection(@redis_pool) do |conn|
-          exists_or_create!
+          exists_or_create_ext!
           release_stale_locks!
           current_token = conn.lpop(available_key)
           return false if current_token.nil?

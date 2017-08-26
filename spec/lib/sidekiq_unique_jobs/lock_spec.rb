@@ -2,7 +2,7 @@
 
 require 'spec_helper'
 
-RSpec.describe SidekiqUniqueJobs::Lock, 'when using Redis', redis: :real, redis_db: 13 do
+RSpec.describe SidekiqUniqueJobs::Lock, 'when using Redis', redis: :redis, redis_db: 13 do
   let(:lock)                      { described_class.new(lock_item) }
   let(:lock_options)              { {} }
   let(:lock_resources)            { 1 }

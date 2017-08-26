@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 RSpec.configure do |config|
-  config.before(:each, redis: :mocked) do
+  config.before(:each, redis: :mock_redised) do
     require 'mock_redis'
     MOCK_REDIS ||= MockRedis.new
     SidekiqUniqueJobs.configure do |config|
@@ -23,7 +23,7 @@ RSpec.configure do |config|
     allow(Sidekiq).to receive(:redis).and_yield(MOCK_REDIS)
   end
 
-  config.before(:each, redis: :real) do |example|
+  config.before(:each, redis: :redis) do |example|
     redis_db = example.metadata.fetch(:redis_db) { 0 }
     redis_url = "redis://localhost/#{redis_db}"
     redis_options = { url: redis_url }
@@ -73,13 +73,13 @@ RSpec.configure do |config|
     end
   end
 
-  config.after(:each, redis: :mocked) do
+  config.after(:each, redis: :mock_redised) do
     SidekiqUniqueJobs.configure do |config|
       config.redis_test_mode = :redis
     end
   end
 
-  config.after(:each, redis: :real) do |example|
+  config.after(:each, redis: :redis) do |example|
     Sidekiq.redis(&:flushdb)
     respond_to_middleware = defined?(Sidekiq::Testing) && Sidekiq::Testing.respond_to?(:server_middleware)
     Sidekiq::Testing.server_middleware(&:clear) if respond_to_middleware

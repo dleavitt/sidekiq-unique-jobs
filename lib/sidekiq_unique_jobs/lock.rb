@@ -3,6 +3,7 @@
 module SidekiqUniqueJobs
   class Lock # rubocop:disable ClassLength
     API_VERSION = '1'
+    EXISTS = '1'
     EXPIRES_IN = 10
 
     # stale_client_timeout is the threshold of time before we assume
@@ -29,11 +30,11 @@ module SidekiqUniqueJobs
     end
 
     def exists_or_create!
-      @persisted_jid = SidekiqUniqueJobs::Scripts.call(
+      SidekiqUniqueJobs::Scripts.call(
         :exists_or_create,
         @redis_pool,
         keys: [exists_key, grabbed_key, available_key, version_key],
-        argv: [@item[JID_KEY], @lock_resources, @lock_expiration, API_VERSION],
+        argv: [EXISTS, @lock_resources, @lock_expiration, API_VERSION],
       )
     end
 

@@ -2,7 +2,7 @@
 
 require 'rails_helper'
 
-describe WorkController, 'with real redis', redis: :real, redis_db: 1 do
+describe WorkController, 'with real redis', redis: :redis, redis_db: 1 do
   before(:each) do
     SidekiqUniqueJobs.configure do |config|
       config.redis_test_mode = :redis

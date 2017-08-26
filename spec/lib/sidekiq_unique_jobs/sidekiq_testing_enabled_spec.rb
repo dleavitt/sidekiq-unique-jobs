@@ -159,10 +159,10 @@ RSpec.shared_examples 'sidekiq testing extensions are enabled' do
   end
 end
 
-RSpec.describe 'When Sidekiq::Testing is enabled', redis: :mock do
+RSpec.describe 'When Sidekiq::Testing is enabled', redis: :mock_redis do
   it_behaves_like 'sidekiq testing extensions are enabled'
 end
 
-RSpec.describe 'When Sidekiq::Testing is enabled', redis: :real do
+RSpec.describe 'When Sidekiq::Testing is enabled', redis: :redis, redis_db: 12 do
   it_behaves_like 'sidekiq testing extensions are enabled'
 end

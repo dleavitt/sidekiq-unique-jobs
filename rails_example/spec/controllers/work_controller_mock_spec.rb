@@ -4,7 +4,7 @@ require 'rails_helper'
 
 MOCK_REDIS = MockRedis.new
 
-describe WorkController, 'with mock redis', redis: :mocked do
+describe WorkController, 'with mock redis', redis: :mock_redised do
   describe 'GET /work/duplicate_simple' do
     context 'when test mode is fake', sidekiq: :fake do
       specify do

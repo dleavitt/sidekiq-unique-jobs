@@ -6,7 +6,7 @@ require 'sidekiq/cli'
 require 'sidekiq/worker'
 require 'sidekiq_unique_jobs/server/middleware'
 
-RSpec.describe SidekiqUniqueJobs::Server::Middleware, redis: :real do
+RSpec.describe SidekiqUniqueJobs::Server::Middleware, redis: :redis do
   let(:middleware) { SidekiqUniqueJobs::Server::Middleware.new }
 
   QUEUE ||= 'working'

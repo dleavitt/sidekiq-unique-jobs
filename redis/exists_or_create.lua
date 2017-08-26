@@ -13,7 +13,6 @@ local persisted_token = redis.call('GETSET', exists_key, exists_token)
 if persisted_token then
   if not redis.call('GET', version_key) then
     redis.call('SET', version_key, api_version)
-    return 0
   end
 
   return persisted_token

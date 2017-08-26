@@ -7,7 +7,7 @@ require 'sidekiq_unique_jobs/server/middleware'
 require 'sidekiq_unique_jobs/client/middleware'
 require 'sidekiq_unique_jobs/sidekiq_unique_ext'
 
-RSpec.describe 'Sidekiq::Api', redis: :real do
+RSpec.describe 'Sidekiq::Api', redis: :redis do
   let(:item) do
     { 'class' => 'JustAWorker',
       'queue' => 'testqueue',

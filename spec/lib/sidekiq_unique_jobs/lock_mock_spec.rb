@@ -2,7 +2,7 @@
 
 require 'spec_helper'
 
-RSpec.describe SidekiqUniqueJobs::Lock, 'when using MockRedis', redis: :mocked do
+RSpec.describe SidekiqUniqueJobs::Lock, 'when using MockRedis', redis: :mock_redised do
   let(:lock)                      { described_class.new(lock_item) }
   let(:lock_options)              { {} }
   let(:lock_resources)            { 1 }
