@@ -2,7 +2,7 @@
 
 require 'spec_helper'
 
-RSpec.describe SidekiqUniqueJobs::Util do
+RSpec.describe SidekiqUniqueJobs::Util, redis: :real do
   let(:item_hash) do
     {
       'class'       => 'MyUniqueJob',

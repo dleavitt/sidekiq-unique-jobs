@@ -8,7 +8,7 @@ module Sidekiq
       # Clear all jobs for this worker
       def clear
         jobs.each do |job|
-          unlock(job) if Sidekiq::Testing.fake?
+         SidekiqUniqueJobs::Unlockable.unlock(job) if Sidekiq::Testing.fake?
         end
 
         Sidekiq::Queues[queue].clear
@@ -19,10 +19,6 @@ module Sidekiq
         def execute_job(worker, args)
           worker.perform(*args)
         end
-      end
-
-      def unlock(job)
-        SidekiqUniqueJobs::Unlockable.unlock(job)
       end
     end
 

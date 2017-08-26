@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 require 'spec_helper'
-RSpec.describe SidekiqUniqueJobs::Scripts do
+RSpec.describe SidekiqUniqueJobs::Scripts, redis: :real do
   subject { SidekiqUniqueJobs::Scripts }
 
   it { is_expected.to respond_to(:call).with(3).arguments }

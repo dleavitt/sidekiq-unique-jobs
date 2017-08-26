@@ -38,6 +38,13 @@ RSpec.describe SidekiqUniqueJobs::Timeout::Calculator do
 
   describe '#worker_class_run_lock_expiration' do
     subject { calculator.worker_class_run_lock_expiration }
+    let(:worker_class) { 'LongRunningRunLockExpirationJob' }
+
+    it { is_expected.to eq(3_600) }
+  end
+
+  describe '#worker_class_lock_expiration' do
+    subject { calculator.worker_class_lock_expiration }
     let(:worker_class) { 'LongRunningJob' }
 
     it { is_expected.to eq(7_200) }

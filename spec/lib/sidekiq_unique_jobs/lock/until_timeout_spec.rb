@@ -2,7 +2,7 @@
 
 require 'spec_helper'
 
-RSpec.describe SidekiqUniqueJobs::Lock::UntilTimeout do
+RSpec.describe SidekiqUniqueJobs::Lock::UntilTimeout, redis: :real do
   let(:lock) { described_class.new(item) }
 
   let(:item) do

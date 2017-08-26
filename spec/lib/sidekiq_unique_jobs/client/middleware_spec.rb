@@ -5,11 +5,7 @@ require 'sidekiq/worker'
 require 'sidekiq-unique-jobs'
 require 'rspec/wait'
 
-RSpec.describe SidekiqUniqueJobs::Client::Middleware, redis_db: 1 do
-  def digest_for(item)
-    SidekiqUniqueJobs::UniqueArgs.digest(item)
-  end
-
+RSpec.describe SidekiqUniqueJobs::Client::Middleware, redis: :real, redis_db: 1 do
   describe 'with real redis' do
     describe 'when a job is already scheduled' do
       it 'processes jobs properly' do
@@ -95,7 +91,7 @@ RSpec.describe SidekiqUniqueJobs::Client::Middleware, redis_db: 1 do
 
       it 'schedules allows jobs to be scheduled ' do
         class ShitClass
-          def do_it(_arg)
+          def do_it(*)
             # whatever
           end
         end
@@ -198,7 +194,7 @@ RSpec.describe SidekiqUniqueJobs::Client::Middleware, redis_db: 1 do
         conn.keys('uniquejobs:*').each do |key|
           next if key.end_with?(':GRABBED')
 
-          expect(conn.ttl(key)).to be_within(1).of(ExpiringJob.get_sidekiq_options['expiration'])
+          expect(conn.ttl(key)).to be_within(1).of(ExpiringJob.get_sidekiq_options['lock_expiration'])
         end
       end
     end
@@ -289,14 +285,14 @@ RSpec.describe SidekiqUniqueJobs::Client::Middleware, redis_db: 1 do
     it 'expires the digest when a scheduled job is scheduled at' do
       expected_expires_at =
         (Time.at(Time.now.to_i + 15 * 60) - Time.now.utc) +
-        SidekiqUniqueJobs.config.default_queue_lock_expiration
+        SidekiqUniqueJobs.config.default_queue_lock_expiration.to_f
 
       MyUniqueJob.perform_in(expected_expires_at, 'mike')
 
       Sidekiq.redis do |conn|
         conn.keys('uniquejobs:*').each do |key|
           next if key.end_with?(':GRABBED')
-          expect(conn.ttl(key)).to be_within(1).of(9_899)
+          expect(conn.ttl(key)).to be_within(10).of(9_900 )
         end
       end
     end

@@ -2,5 +2,5 @@
 
 require 'spec_helper'
 
-RSpec.describe SidekiqUniqueJobs::Lock::WhileExecuting do
+RSpec.describe SidekiqUniqueJobs::Lock::WhileExecuting, redis: :real do
 end

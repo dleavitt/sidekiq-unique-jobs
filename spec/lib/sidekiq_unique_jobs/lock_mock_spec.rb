@@ -2,7 +2,7 @@
 
 require 'spec_helper'
 
-RSpec.describe SidekiqUniqueJobs::Lock, 'when using Redis', redis: :real, redis_db: 13 do
+RSpec.describe SidekiqUniqueJobs::Lock, 'when using MockRedis', redis: :mocked do
   let(:lock)                      { described_class.new(lock_item) }
   let(:lock_options)              { {} }
   let(:lock_resources)            { 1 }
@@ -41,6 +41,10 @@ RSpec.describe SidekiqUniqueJobs::Lock, 'when using Redis', redis: :real, redis_
       'use_local_time' => multilock_use_local_time,
       'stale_client_timeout' => multilock_stale_client_timeout,
     }
+  end
+
+  before do
+    SidekiqUniqueJobs.connection { |conn| expect(conn).to be_a(MockRedis) }
   end
 
   describe 'redis' do
@@ -243,58 +247,35 @@ RSpec.describe SidekiqUniqueJobs::Lock, 'when using Redis', redis: :real, redis_
       let(:lock_stale_client_timeout)      { 5 }
       let(:multilock_stale_client_timeout) { 5 }
 
-      context 'when redis_version is old' do
-        before do
-          allow(SidekiqUniqueJobs).to receive(:redis_version).and_return('3.0')
-        end
+      it_behaves_like 'a lock'
 
-        it_behaves_like 'a lock'
+      it 'should restore resources of stale clients' do
+        another_lock_item = lock_item.merge('lock_resources' => 1, 'stale_client_timeout' => 1)
+        hyper_aggressive_lock = described_class.new(another_lock_item)
 
-        it 'should restore resources of stale clients' do
-          another_lock_item = lock_item.merge('lock_resources' => 1, 'stale_client_timeout' => 1)
-          hyper_aggressive_lock = described_class.new(another_lock_item)
-
-          expect(hyper_aggressive_lock.lock(1)).not_to eq(false)
-          expect(hyper_aggressive_lock.lock(1)).to eq(false)
-          expect(hyper_aggressive_lock.lock(1)).not_to eq(false)
-        end
-      end
-
-      context 'when redis_version is new' do
-        before do
-          allow(SidekiqUniqueJobs).to receive(:redis_version).and_return('4.0')
-        end
-
-        it_behaves_like 'a lock'
-
-        it 'should restore resources of stale clients' do
-          another_lock_item = lock_item.merge('lock_resources' => 1, 'stale_client_timeout' => 1)
-          hyper_aggressive_lock = described_class.new(another_lock_item)
-
-          expect(hyper_aggressive_lock.lock(1)).not_to eq(false)
-          expect(hyper_aggressive_lock.lock(1)).to eq(false)
-          expect(hyper_aggressive_lock.lock(1)).not_to eq(false)
-        end
+        expect(hyper_aggressive_lock.lock(1)).not_to eq(false)
+        expect(hyper_aggressive_lock.lock(1)).to eq(false)
+        expect(hyper_aggressive_lock.lock(1)).not_to eq(false)
       end
     end
 
     describe 'redis time' do
+      subject { lock.send(:current_time) }
+
       let(:lock_stale_client_timeout) { 5 }
 
       before(:all) do
         Timecop.freeze(Time.local(1990))
       end
 
-      it 'with time support should return a different time than frozen time' do
-        expect(lock.send(:current_time)).not_to eq(Time.now)
-      end
+      # Since we are never hitting a redis server
+      # MockRedis uses ruby time for this
+      it { is_expected.to eq(Time.now) }
 
       context 'when use_local_time is true' do
         let(:lock_use_local_time) { true }
 
-        it 'with use_local_time should return the same time as frozen time' do
-          expect(lock.send(:current_time)).to eq(Time.now)
-        end
+        it { is_expected.to eq(Time.now) }
       end
     end
 

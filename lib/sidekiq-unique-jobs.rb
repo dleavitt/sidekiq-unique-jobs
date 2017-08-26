@@ -28,6 +28,7 @@ module SidekiqUniqueJobs
       unique_prefix: 'uniquejobs',
       default_queue_lock_expiration: 30 * 60,
       default_run_lock_expiration: 60,
+      default_lock_timeout: 0,
       default_lock: :while_executing,
       redis_test_mode: :redis, # :mock
       raise_unique_args_errors: false,

@@ -2,7 +2,6 @@
 
 module SidekiqUniqueJobs
   class Lock # rubocop:disable ClassLength
-    EXISTS_TOKEN = '1'
     API_VERSION = '1'
     EXPIRES_IN = 10
 
@@ -16,22 +15,25 @@ module SidekiqUniqueJobs
     # SidekiqUniqueJobs::Lock::WhileExecuting.new(item, :host => "", :port => "")
     # SidekiqUniqueJobs::Lock::WhileExecuting.new(item, :path => "bla")
     def initialize(item, redis_pool = nil)
-      @item = item
-      @name = unique_digest
-      @redis_pool = redis_pool
-      @expiration = @item[SidekiqUniqueJobs::EXPIRATION_KEY]
-      @resource_count = @item[SidekiqUniqueJobs::RESOURCES_KEY] || 1
+      @item                 = item
+      @current_jid          = @item[JID_KEY]
+      @name                 = unique_digest
+      @redis_pool           = redis_pool
+      @lock_expiration      = @item[SidekiqUniqueJobs::LOCK_EXPIRATION_KEY]
+      @lock_timeout         = @item[SidekiqUniqueJobs::LOCK_TIMEOUT_KEY]
+      @lock_resources       = @item[SidekiqUniqueJobs::LOCK_RESOURCES_KEY] || 1
       @stale_client_timeout = @item[SidekiqUniqueJobs::STALE_CLIENT_TIMEOUT_KEY]
-      @use_local_time = @item[SidekiqUniqueJobs::USE_LOCAL_TIME_KEY]
-      @tokens = []
+      @use_local_time       = @item[SidekiqUniqueJobs::USE_LOCAL_TIME_KEY]
+      @reschedule           = @item[SidekiqUniqueJobs::RESCHEDULE_KEY]
+      @tokens               = []
     end
 
     def exists_or_create!
-      SidekiqUniqueJobs::Scripts.call(
+      @persisted_jid = SidekiqUniqueJobs::Scripts.call(
         :exists_or_create,
         @redis_pool,
         keys: [exists_key, grabbed_key, available_key, version_key],
-        argv: [EXISTS_TOKEN, @resource_count, @expiration, API_VERSION],
+        argv: [@item[JID_KEY], @lock_resources, @lock_expiration, API_VERSION],
       )
     end
 
@@ -46,7 +48,7 @@ module SidekiqUniqueJobs
         if conn.exists(exists_key)
           conn.llen(available_key)
         else
-          @resource_count
+          @lock_resources
         end
       end
     end
@@ -60,7 +62,7 @@ module SidekiqUniqueJobs
       end
     end
 
-    def lock(timeout = nil) # rubocop:disable Metrics/MethodLength
+    def lock(timeout = nil) # rubocop:disable MethodLength
       exists_or_create!
       release_stale_locks!
 
@@ -93,9 +95,10 @@ module SidekiqUniqueJobs
 
     def unlock
       return false unless locked?
-      SidekiqUniqueJobs.connection(@redis_pool) do |conn|
+      result = SidekiqUniqueJobs.connection(@redis_pool) do |conn|
         signal(conn, @tokens.pop)[1]
       end
+      result
     end
 
     def locked?(token = nil)
@@ -157,6 +160,26 @@ module SidekiqUniqueJobs
       end
     end
 
+    def available_key
+      @available_key ||= namespaced_key('AVAILABLE')
+    end
+
+    def exists_key
+      @exists_key ||= namespaced_key('EXISTS')
+    end
+
+    def grabbed_key
+      @grabbed_key ||= namespaced_key('GRABBED')
+    end
+
+    def version_key
+      @version_key ||= namespaced_key('VERSION')
+    end
+
+    def release_key
+      @release_key ||= namespaced_key('RELEASE')
+    end
+
     private
 
     def release_stale_locks_lua!
@@ -164,7 +187,7 @@ module SidekiqUniqueJobs
         :release_stale_locks,
         @redis_pool,
         keys:  [exists_key, grabbed_key, available_key, version_key, release_key],
-        argv: [EXPIRES_IN, @stale_client_timeout, @expiration],
+        argv: [EXPIRES_IN, @stale_client_timeout, @lock_expiration],
       )
     end
 
@@ -211,10 +234,10 @@ module SidekiqUniqueJobs
     end
 
     def expire_when_necessary(conn)
-      return if @expiration.nil?
+      return if @lock_expiration.nil?
 
       [available_key, exists_key, version_key].each do |key|
-        conn.expire(key, @expiration)
+        conn.expire(key, @lock_expiration)
       end
     end
 
@@ -224,26 +247,6 @@ module SidekiqUniqueJobs
 
     def namespaced_key(variable)
       "#{@name}:#{variable}"
-    end
-
-    def available_key
-      @available_key ||= namespaced_key('AVAILABLE')
-    end
-
-    def exists_key
-      @exists_key ||= namespaced_key('EXISTS')
-    end
-
-    def grabbed_key
-      @grabbed_key ||= namespaced_key('GRABBED')
-    end
-
-    def version_key
-      @version_key ||= namespaced_key('VERSION')
-    end
-
-    def release_key
-      @release_key ||= namespaced_key('RELEASE')
     end
 
     def current_time
@@ -267,6 +270,9 @@ module SidekiqUniqueJobs
   end
 end
 
+require 'sidekiq_unique_jobs/lock/prepares_items'
+require 'sidekiq_unique_jobs/lock/queue_lock_base'
+require 'sidekiq_unique_jobs/lock/run_lock_base'
 require 'sidekiq_unique_jobs/lock/until_executed'
 require 'sidekiq_unique_jobs/lock/until_executing'
 require 'sidekiq_unique_jobs/lock/while_executing'

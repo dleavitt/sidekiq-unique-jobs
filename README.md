@@ -33,9 +33,31 @@ The server can also lock a job. It does so by creating a lock when it is executi
 
 ### Options
 
-#### Expiration
+#### Lock Expiration
 
-#### Timeout
+This is the a number in seconds that the lock should be considered unique for. By default the lock doesn't expire at all. 
+
+If you want to experiment with various expirations please provide the following argument: 
+
+```ruby
+sidekiq_options lock_expiration: (2 * 60) # 2 minutes
+```
+
+#### Lock Timeout
+
+This is the timeout (how long to wait) for creating the lock. By default we don't use a timeout so we won't wait for the lock to be created. If you want it is possible to set this like below.
+
+```ruby
+sidekiq_options lock_timeout: 5 # 5 seconds
+```
+
+#### Lock Resources
+
+This allows us to perform multiple locks for a unique key. 
+
+```ruby
+sidekiq_options lock_resources: 2 # Use 2 locks
+```
 
 #### 
 
@@ -124,16 +146,16 @@ or until the job has been completed. Thus, the job will be unique for the shorte
 If you want the unique job to stick around even after it has been successfully
 processed then just set `unique: :until_timeout`.
 
-You can also control the expiration length of the uniqueness check. If you want to enforce uniqueness over a longer period than the default of 30 minutes then you can pass the number of seconds you want to use to the sidekiq options:
+You can also control the `lock_expiration` of the uniqueness check. If you want to enforce uniqueness over a longer period than the default of 30 minutes then you can pass the number of seconds you want to use to the sidekiq options:
 
 ```ruby
-sidekiq_options unique: :until_timeout, expiration: 120 * 60 # 2 hours
+sidekiq_options unique: :until_timeout, lock_expiration: 120 * 60 # 2 hours
 ```
 
 For locking modes (`:while_executing` and `:until_and_while_executing`) you can control the expiration length of the runtime uniqueness. If you want to enforce uniqueness over a longer period than the default of 60 seconds, then you can pass the number of seconds you want to use to the sidekiq options:
 
 ```ruby
-sidekiq_options unique: :while_executing, expiration: 2 * 60 # 2 minutes
+sidekiq_options unique: :while_executing, lock_expiration: 2 * 60 # 2 minutes
 ```
 
 Requiring the gem in your gemfile should be sufficient to enable unique jobs.

@@ -5,7 +5,7 @@ require 'sidekiq/worker'
 require 'sidekiq-unique-jobs'
 require 'sidekiq/scheduled'
 
-RSpec.describe 'When Sidekiq::Testing is enabled' do
+RSpec.shared_examples 'sidekiq testing extensions are enabled' do
   describe 'when set to :fake!', sidekiq: :fake do
     context 'with unique worker' do
       it 'does not push duplicate messages' do
@@ -20,15 +20,15 @@ RSpec.describe 'When Sidekiq::Testing is enabled' do
       it 'unlocks jobs after draining a worker' do
         param = 'work'
         param2 = 'more work'
-
         expect(UntilExecutedJob.jobs.size).to eq(0)
-        UntilExecutedJob.perform_async(param)
-        UntilExecutedJob.perform_async(param2)
+        expect(UntilExecutedJob.perform_async(param)).not_to be_nil
+        expect(UntilExecutedJob.perform_async(param2)).not_to be_nil
         expect(UntilExecutedJob.jobs.size).to eq(2)
         UntilExecutedJob.drain
         expect(UntilExecutedJob.jobs.size).to eq(0)
-        UntilExecutedJob.perform_async(param)
-        UntilExecutedJob.perform_async(param2)
+        sleep 1
+        expect(UntilExecutedJob.perform_async(param)).not_to be_nil
+        expect(UntilExecutedJob.perform_async(param2)).not_to be_nil
         expect(UntilExecutedJob.jobs.size).to eq(2)
       end
 
@@ -36,14 +36,15 @@ RSpec.describe 'When Sidekiq::Testing is enabled' do
         param = 'work'
         param2 = 'more work'
         expect(UntilExecutedJob.jobs.size).to eq(0)
-        UntilExecutedJob.perform_async(param)
-        UntilExecutedJob.perform_async(param2)
+        expect(UntilExecutedJob.perform_async(param)).not_to be_nil
+        expect(UntilExecutedJob.perform_async(param2)).not_to be_nil
         expect(UntilExecutedJob.jobs.size).to eq(2)
         UntilExecutedJob.perform_one
         expect(UntilExecutedJob.jobs.size).to eq(1)
-        UntilExecutedJob.perform_async(param2)
+        expect(UntilExecutedJob.perform_async(param2)).to be_nil
         expect(UntilExecutedJob.jobs.size).to eq(1)
-        UntilExecutedJob.perform_async(param)
+        sleep 1
+        expect(UntilExecutedJob.perform_async(param)).not_to be_nil
         expect(UntilExecutedJob.jobs.size).to eq(2)
       end
 
@@ -156,4 +157,12 @@ RSpec.describe 'When Sidekiq::Testing is enabled' do
       end
     end
   end
+end
+
+RSpec.describe 'When Sidekiq::Testing is enabled', redis: :mock do
+  it_behaves_like 'sidekiq testing extensions are enabled'
+end
+
+RSpec.describe 'When Sidekiq::Testing is enabled', redis: :real do
+  it_behaves_like 'sidekiq testing extensions are enabled'
 end

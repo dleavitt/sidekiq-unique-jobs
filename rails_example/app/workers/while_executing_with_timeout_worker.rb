@@ -3,7 +3,7 @@
 class WhileExecutingWithTimeoutWorker
   include Sidekiq::Worker
 
-  sidekiq_options unique: :while_executing, expiration: 5, unique_args: ->(args) { args.second }
+  sidekiq_options unique: :while_executing, lock_timeout: 5, unique_args: ->(args) { args.second }
 
   def perform(one, two)
     Sidekiq::Logging.with_context(self.class.name) do

@@ -2,7 +2,7 @@
 
 require 'spec_helper'
 
-RSpec.describe SidekiqUniqueJobs::Lock::UntilAndWhileExecuting, redis_db: 2 do
+RSpec.describe SidekiqUniqueJobs::Lock::UntilAndWhileExecuting, redis: :real, redis_db: 2 do
   let(:lock) { described_class.new(item) }
   let(:item) do
     {

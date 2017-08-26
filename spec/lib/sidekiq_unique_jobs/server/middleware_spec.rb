@@ -6,14 +6,10 @@ require 'sidekiq/cli'
 require 'sidekiq/worker'
 require 'sidekiq_unique_jobs/server/middleware'
 
-RSpec.describe SidekiqUniqueJobs::Server::Middleware do
+RSpec.describe SidekiqUniqueJobs::Server::Middleware, redis: :real do
   let(:middleware) { SidekiqUniqueJobs::Server::Middleware.new }
 
   QUEUE ||= 'working'
-
-  def digest_for(item)
-    SidekiqUniqueJobs::UniqueArgs.digest(item)
-  end
 
   describe '#call' do
     subject { middleware.call(*args) {} }
@@ -49,18 +45,17 @@ RSpec.describe SidekiqUniqueJobs::Server::Middleware do
         jid = UntilExecutedJob.perform_async
         item = Sidekiq::Queue.new(QUEUE).find_job(jid).item
 
-        unique_digest = digest_for(item)
-
+        lock = SidekiqUniqueJobs::Lock.new(item)
         Sidekiq.redis do |conn|
-          conn.set(unique_digest, 'NOT_DELETED')
+          conn.set(lock.exists_key, 'NOT_DELETED')
         end
 
         expect(Sidekiq.logger).to receive(:fatal)
-          .with("the unique_key: #{unique_digest} needs to be unlocked manually")
+          .with("the unique_key: #{item[SidekiqUniqueJobs::UNIQUE_DIGEST_KEY]} needs to be unlocked manually")
 
         middleware.call(UntilExecutedJob.new, item, QUEUE) do
           Sidekiq.redis do |conn|
-            expect(conn.get(unique_digest)).to eq('NOT_DELETED')
+            expect(conn.get(lock.exists_key)).to eq('NOT_DELETED')
           end
         end
       end

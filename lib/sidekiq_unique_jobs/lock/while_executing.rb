@@ -2,40 +2,35 @@
 
 module SidekiqUniqueJobs
   class Lock
-    class WhileExecuting
-      def initialize(item, redis_pool = nil)
-        @item = item
-        @redis_pool = redis_pool
-        @item[EXPIRATION_KEY] ||= @item[RUN_LOCK_TIMEOUT_KEY]
-        @lock ||= SidekiqUniqueJobs::Lock.new(@item)
-      end
-
+    class WhileExecuting < RunLockBase
+      # Don't lock when client middleware runs
+      #
+      # @param _scope [Symbol] the scope, `:client` or `:server`
+      # @return [Boolean] always returns true
       def lock(_scope)
         true
       end
 
-      def execute(callback = nil)
-        performed = @lock.lock(timeout) do
+      # Locks while server middleware executes the job
+      #
+      # @param callback [Proc] callback to call when finished
+      # @return [Boolean] report success
+      # @raise [SidekiqUniqueJobs::LockTimeout] when lock fails within configured timeout
+      def execute(callback, &block)
+        performed = @lock.lock(@calculator.lock_timeout) do
+          callback&.call
           yield
-          callback.call
         end
-
         fail_with_lock_timeout! unless performed
+        unlock(:server)
+
+        performed
       end
 
-      def unlock
+      # Unlock the current item
+      #
+      def unlock(scope)
         @lock.unlock
-      end
-
-      private
-
-      def timeout
-        @timeout ||= Timeout::RunLock.new(@item).seconds
-      end
-
-      def fail_with_lock_timeout!
-        raise(SidekiqUniqueJobs::LockTimeout,
-              "couldn't achieve lock for #{@lock.available_key} within: #{timeout} seconds")
       end
     end
   end

@@ -29,7 +29,6 @@ module SidekiqUniqueJobs
       end
 
       def acquire_lock
-        return true unless lock.respond_to?(:lock)
         locked = lock.lock(:client)
         warn_about_duplicate(item) unless locked
         locked

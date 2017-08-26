@@ -7,7 +7,7 @@ require 'sidekiq_unique_jobs/server/middleware'
 require 'sidekiq_unique_jobs/client/middleware'
 require 'sidekiq_unique_jobs/sidekiq_unique_ext'
 
-RSpec.describe 'Sidekiq::Api' do
+RSpec.describe 'Sidekiq::Api', redis: :real do
   let(:item) do
     { 'class' => 'JustAWorker',
       'queue' => 'testqueue',
@@ -23,14 +23,6 @@ RSpec.describe 'Sidekiq::Api' do
     )
   end
 
-  def schedule_job
-    JustAWorker.perform_in(60 * 60 * 3, foo: 'bar')
-  end
-
-  def perform_async
-    JustAWorker.perform_async(foo: 'bar')
-  end
-
   describe Sidekiq::SortedEntry::UniqueExtension do
     let(:expected_keys) do
       %w[
@@ -40,8 +32,9 @@ RSpec.describe 'Sidekiq::Api' do
         uniquejobs:863b7cb639bd71c828459b97788b2ada:VERSION
       ]
     end
+
     it 'deletes uniqueness lock on delete' do
-      expect(schedule_job).to be_truthy
+      expect(JustAWorker.perform_in(60 * 60 * 3, foo: 'bar')).to be_truthy
       Sidekiq.redis do |conn|
         expect(conn.keys).to match_array(expected_keys)
       end
@@ -51,16 +44,16 @@ RSpec.describe 'Sidekiq::Api' do
         expect(conn.keys).to match_array([])
       end
 
-      expect(schedule_job).to be_truthy
+      expect(JustAWorker.perform_in(60 * 60 * 3, foo: 'bar')).to be_truthy
     end
   end
 
   describe Sidekiq::Job::UniqueExtension do
     it 'deletes uniqueness lock on delete' do
-      jid = perform_async
+      jid = JustAWorker.perform_async(foo: 'bar')
       Sidekiq::Queue.new('testqueue').find_job(jid).delete
       Sidekiq.redis do |conn|
-        expect(conn.exists(unique_key)).to be_falsy
+        expect(conn.keys).to match_array(%w[queues])
       end
       expect(true).to be_truthy
     end
@@ -68,20 +61,20 @@ RSpec.describe 'Sidekiq::Api' do
 
   describe Sidekiq::Queue::UniqueExtension do
     it 'deletes uniqueness locks on clear' do
-      perform_async
+      JustAWorker.perform_async(foo: 'bar')
       Sidekiq::Queue.new('testqueue').clear
       Sidekiq.redis do |conn|
-        expect(conn.exists(unique_key)).to be_falsy
+        expect(conn.keys).to match_array([])
       end
     end
   end
 
   describe Sidekiq::JobSet::UniqueExtension do
     it 'deletes uniqueness locks on clear' do
-      schedule_job
+      JustAWorker.perform_in(60 * 60 * 3, foo: 'bar')
       Sidekiq::JobSet.new('schedule').clear
       Sidekiq.redis do |conn|
-        expect(conn.exists(unique_key)).to be_falsy
+        expect(conn.keys).to match_array([])
       end
     end
   end
