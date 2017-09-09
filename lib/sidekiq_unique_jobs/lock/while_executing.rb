@@ -16,7 +16,7 @@ module SidekiqUniqueJobs
       # @param callback [Proc] callback to call when finished
       # @return [Boolean] report success
       # @raise [SidekiqUniqueJobs::LockTimeout] when lock fails within configured timeout
-      def execute(callback, &block)
+      def execute(callback)
         @lock.lock(@calculator.lock_timeout) do |token|
           if token == @item[JID_KEY]
             callback&.call
@@ -30,7 +30,7 @@ module SidekiqUniqueJobs
 
       # Unlock the current item
       #
-      def unlock(scope)
+      def unlock(_scope)
         @lock.unlock
         @lock.delete!
       end

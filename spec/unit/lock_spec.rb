@@ -115,7 +115,7 @@ end
 
 RSpec.shared_examples 'a real lock' do
   describe 'lock with expiration' do
-    let(:lock_expiration)      { 1 }
+    let(:lock_expiration) { 1 }
 
     it_behaves_like 'a lock'
 
@@ -160,7 +160,7 @@ RSpec.shared_examples 'a real lock' do
   end
 
   describe 'lock with staleness checking' do
-    let(:lock_stale_client_timeout)      { 5 }
+    let(:lock_stale_client_timeout) { 5 }
 
     context 'when redis_version is old' do
       before do

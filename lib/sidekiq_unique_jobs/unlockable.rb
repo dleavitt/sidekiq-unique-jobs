@@ -11,7 +11,7 @@ module SidekiqUniqueJobs
     end
 
     def delete!(item)
-      digest = SidekiqUniqueJobs::UniqueArgs.digest(item)
+      SidekiqUniqueJobs::UniqueArgs.digest(item)
       lock = SidekiqUniqueJobs::Lock.new(item)
       lock.unlock
       lock.delete!

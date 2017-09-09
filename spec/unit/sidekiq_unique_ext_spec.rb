@@ -27,10 +27,10 @@ RSpec.describe 'Sidekiq::Api', redis: :redis do
     it 'deletes uniqueness lock on delete' do
       expect(JustAWorker.perform_in(60 * 60 * 3, foo: 'bar')).to be_truthy
       Sidekiq.redis do |conn|
-        expect(conn.keys).to include(*%w[
-          uniquejobs:863b7cb639bd71c828459b97788b2ada:EXISTS
-          uniquejobs:863b7cb639bd71c828459b97788b2ada:GRABBED
-        ])
+        expect(conn.keys).to include(
+          'uniquejobs:863b7cb639bd71c828459b97788b2ada:EXISTS',
+          'uniquejobs:863b7cb639bd71c828459b97788b2ada:GRABBED',
+        )
       end
 
       Sidekiq::ScheduledSet.new.each(&:delete)

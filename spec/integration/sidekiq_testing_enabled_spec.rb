@@ -127,7 +127,7 @@ RSpec.shared_examples 'sidekiq testing extensions are enabled' do
 
   describe 'when set to :inline!', sidekiq: :inline do
     it 'once the job is completed allows to run another one' do
-      expect(TestClass).to receive(:run).with('test').twice
+      expect(TestClass).to receive(:run).with('plosibubb').twice
       InlineWorker.perform_async('plosibubb')
       InlineWorker.perform_async('plosibubb')
     end

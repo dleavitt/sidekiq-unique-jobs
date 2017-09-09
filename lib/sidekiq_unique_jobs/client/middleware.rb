@@ -13,6 +13,7 @@ module SidekiqUniqueJobs
 
       def call(worker_class, item, queue, redis_pool = nil)
         @worker_class = worker_class_constantize(worker_class)
+        SidekiqUniqueJobs::UniqueArgs.digest(item)
         @item = item
         @queue = queue
         @redis_pool = redis_pool

@@ -24,7 +24,7 @@ module SidekiqUniqueJobs
         end
       end
 
-      def exists_or_create_ext!
+      def exists_or_create_ext! # rubocop:disable Metrics/MethodLength
         return exists_or_create_orig! unless SidekiqUniqueJobs.mocked?
 
         SidekiqUniqueJobs.connection do |conn|
@@ -49,14 +49,11 @@ module SidekiqUniqueJobs
         end
       end
 
-      def lock_ext(timeout = nil) # rubocop:disable MethodLength
+      def lock_ext(timeout = nil) # rubocop:disable Metrics/LineLength, Metrics/MethodLength, Metrics/PerceivedComplexity, Metrics/CyclomaticComplexity
         unless SidekiqUniqueJobs.mocked?
-          if block_given?
-            return lock_orig(timeout) do |token|
-              yield
-            end
-          else
-            return lock_orig(timeout)
+          return lock_orig(timeout) unless block_given?
+          return lock_orig(timeout) do |_token|
+            yield
           end
         end
 
@@ -64,7 +61,7 @@ module SidekiqUniqueJobs
           exists_or_create_ext!
           release_stale_locks!
 
-          if timeout.nil? || timeout > 0
+          if timeout.nil? || timeout.positive?
             # passing timeout 0 to blpop causes it to block
             _key, current_token = conn.blpop(available_key, timeout || 0)
           else
@@ -103,8 +100,11 @@ module SidekiqUniqueJobs
             server_middleware.call(worker_class.new, item, queue, redis_pool) do
               yield
             end
+
+            yield
           end
           # SidekiqUniqueJobs::Util.del('*', 1000, false)
+          # yield
         else
           call_real(worker_class, item, queue, redis_pool) do
             yield

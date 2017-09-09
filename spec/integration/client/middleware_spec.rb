@@ -85,7 +85,7 @@ RSpec.shared_examples_for 'unique client middleware' do
 
     it 'schedules allows jobs to be scheduled ' do
       class ShitClass
-        def self.do_it(one)
+        def self.do_it(_one)
           # whatever
         end
       end
@@ -193,7 +193,6 @@ RSpec.shared_examples_for 'unique client middleware' do
         end
       end
     end
-
   end
 
   context 'when class is not unique' do
@@ -295,7 +294,7 @@ RSpec.shared_examples_for 'unique client middleware' do
     Sidekiq.redis do |conn|
       conn.keys('uniquejobs:*').each do |key|
         next if key.end_with?(':GRABBED')
-        expect(conn.ttl(key)).to be_within(10).of(9_900 )
+        expect(conn.ttl(key)).to be_within(10).of(9_900)
       end
     end
   end

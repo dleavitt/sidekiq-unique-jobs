@@ -1,11 +1,11 @@
 # frozen_string_literal: true
 
-RSpec.configure do |config|
+RSpec.configure do |config| # rubocop:disable Metrics/BlockLength
   config.before(:each, redis: :mock_redis) do
     require 'mock_redis'
     mock_redis = MockRedis.new
-    SidekiqUniqueJobs.configure do |config|
-      config.redis_test_mode = :mock
+    SidekiqUniqueJobs.configure do |unique|
+      unique.redis_test_mode = :mock
     end
     allow(SidekiqUniqueJobs).to receive(:mocked?).and_return(true)
     allow(SidekiqUniqueJobs).to receive(:redis_version).and_return('0.0')
@@ -38,6 +38,7 @@ RSpec.configure do |config|
 
     if Sidekiq::Testing.respond_to?(:server_middleware)
       Sidekiq::Testing.server_middleware do |chain|
+        chain.add SidekiqUniqueJobs::Client::Middleware
         chain.add SidekiqUniqueJobs::Server::Middleware
       end
     end
@@ -65,8 +66,8 @@ RSpec.configure do |config|
   end
 
   config.after(:each, redis: :mock_redis) do
-    SidekiqUniqueJobs.configure do |config|
-      config.redis_test_mode = :redis
+    SidekiqUniqueJobs.configure do |unique|
+      unique.redis_test_mode = :redis
     end
   end
 

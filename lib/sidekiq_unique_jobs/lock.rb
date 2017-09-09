@@ -17,8 +17,7 @@ module SidekiqUniqueJobs
     def initialize(item, redis_pool = nil)
       @item                 = item
       @current_jid          = @item[JID_KEY]
-      @unique_digest      ||= @item[UNIQUE_DIGEST_KEY]
-      @unique_digest      ||= SidekiqUniqueJobs::UniqueArgs.digest(@item)
+      @unique_digest        = @item[UNIQUE_DIGEST_KEY]
       @redis_pool           = redis_pool
       @lock_expiration      = @item[SidekiqUniqueJobs::LOCK_EXPIRATION_KEY]
       @lock_timeout         = @item[SidekiqUniqueJobs::LOCK_TIMEOUT_KEY]

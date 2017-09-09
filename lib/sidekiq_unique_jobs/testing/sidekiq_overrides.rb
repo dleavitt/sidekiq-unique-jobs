@@ -8,7 +8,7 @@ module Sidekiq
       # Clear all jobs for this worker
       def clear
         jobs.each do |item|
-         SidekiqUniqueJobs::Unlockable.delete!(item)
+          SidekiqUniqueJobs::Unlockable.delete!(item)
         end
 
         Sidekiq::Queues[queue].clear
